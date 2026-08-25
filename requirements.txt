@@ -13,7 +13,7 @@ google-api-core==2.8.2
 googleapis-common-protos==1.56.4
 h5py==3.10.0
 db-dtypes
-
+openpyxl
 
 #mlflow==2.1.1
 
