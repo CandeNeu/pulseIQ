@@ -1,0 +1,49 @@
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+
+def clean_data(df: pd.DataFrame)-> pd.DataFrame:
+    '''
+    Cleaning the data and preprocessing
+    '''
+    #Drop columns
+    df1 = df.drop(columns=['systolic_bp',
+                           'diastolic_bp',
+                           'family_diabetes',
+                           'family_hypertension',
+                           'glucose',
+                           'stroke'])
+
+        #Binaryzing Diabetes to 0 = Normal and 1 = Diabetes
+
+    df1 = clean_data()
+    map_diabetes = {
+        'No': 0,
+        'Yes': 1
+    }
+
+    df1['diabetic'] = df1['diabetic'].map(map_diabetes)
+
+
+    # Binaryzing Sex to 0 = Female and 1 = Male
+
+
+    map_sex = {
+        'Female': 0,
+        'Male': 1
+    }
+
+    df1['gender'] = df1['gender'].map(map_sex)
+
+
+    scaler = StandardScaler()
+
+
+    #scaling and getting our target
+
+    X_scaled = scaler.set_output(transform='pandas').fit_transform(df1[['age', 'pulse_rate', 'height', 'weight', 'bmi']])
+    y_diabetic = df1['diabetic']
+    y_hypertensive = df1['hypertensive']
+    y_cv = df1['cardiovascular_disease']
+
+    return df1, X_scaled, y_diabetic, y_hypertensive, y_cv
