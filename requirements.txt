@@ -16,6 +16,13 @@ db-dtypes
 openpyxl
 optuna
 xgboost
+opencv-python
+
+fastapi
+uvicorn
+pydantic
+joblib
+
 
 #mlflow==2.1.1
 
