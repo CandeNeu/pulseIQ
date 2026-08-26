@@ -15,7 +15,7 @@ API_URL = os.environ.get("API_URL", "http://localhost:8000/predict")
 st.title("🩺 PulseIQ – Diabetes Risk Prediction")
 st.markdown("Enter the patient's details to get a prediction from the model.")
 
-# ============ NYTT: Live pulsmätning från kamera ============
+# ============ Live pulse measurement from camera ============
 if "signal_buffer" not in st.session_state:
     st.session_state.signal_buffer = deque(maxlen=300)  # ~10s @ 30fps
 if "measured_bpm" not in st.session_state:
@@ -25,7 +25,7 @@ signal_buffer = st.session_state.signal_buffer
 
 
 def video_frame_callback(frame):
-    """Körs på varje kameraframe – plockar ut röd ljusstyrka (PPG-signal)."""
+    """Runs on every camera frame – extracts red brightness (PPG signal)."""
     img = frame.to_ndarray(format="bgr24")
     with lock:
         signal_buffer.append(float(img[:, :, 2].mean()))
@@ -33,7 +33,7 @@ def video_frame_callback(frame):
 
 
 def compute_bpm(signal, fps=30.0):
-    """Uppskattar puls (bpm) ur ljussignalen via bandpass + FFT."""
+    """Estimates heart rate (bpm) from the brightness signal via bandpass + FFT."""
     signal = np.array(signal, dtype=np.float32)
     if len(signal) < fps * 3:
         return None
@@ -58,6 +58,11 @@ with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
             key="pulse",
             mode=WebRtcMode.SENDRECV,
             video_frame_callback=video_frame_callback,
+            rtc_configuration={
+                "iceServers": [
+                    {"urls": ["stun:stun.l.google.com:19302"]},
+                ]
+            },
             media_stream_constraints={"video": True, "audio": False},
             async_processing=True,
         )
@@ -76,13 +81,13 @@ with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
                     st.session_state.measured_bpm = bpm
                     bpm_ph.metric("Measured pulse", f"{bpm} bpm")
             time.sleep(0.3)
-# ============ SLUT på nytt block ============
+# ============ End of camera block ============
 
 col1, col2 = st.columns(2)
 with col1:
     age = st.number_input("Age", min_value=0, max_value=120, value=42)
     gender = st.selectbox("Gender", ["Female", "Male"])
-    # NYTT: default-värdet blir den uppmätta pulsen om den finns
+    # Default value becomes the measured pulse if available
     default_pulse = int(st.session_state.measured_bpm) if st.session_state.measured_bpm else 66
     pulse_rate = st.number_input("Pulse rate", min_value=30, max_value=200, value=default_pulse)
     systolic_bp = st.number_input("Systolic BP", min_value=70, max_value=250, value=110)
@@ -97,7 +102,7 @@ with col2:
     cardiovascular_disease = st.selectbox("Cardiovascular disease", ["No", "Yes"])
     stroke = st.selectbox("Stroke", ["No", "Yes"])
 
-# BMI beräknas automatiskt från längd och vikt
+# BMI is calculated automatically from height and weight
 bmi = round(weight / (height ** 2), 2) if height > 0 else 0.0
 st.metric("BMI (auto-calculated)", bmi)
 
