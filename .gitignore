@@ -12,9 +12,7 @@ raw_data/
 __pycache__/
 *.py[codz]
 *$py.class
-<<<<<<< HEAD
 *.img
-=======
 
 example/
 
@@ -27,7 +25,6 @@ example/
 Thumbs.db
 ehthumbs.db
 
->>>>>>> b16c99f9518f4fd5d71aa163e6c9ef14e6067166
 # C extensions
 *.so
 *.csv
