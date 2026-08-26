@@ -1,10 +1,28 @@
 raw_data/
+# ML Models and Artifacts
+/models/
+*.pkl
+*.h5
+*.joblib
+*.pt
+
 .env
 *.zip
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
+
+example/
+
+# Mac OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
 
 # C extensions
 *.so
