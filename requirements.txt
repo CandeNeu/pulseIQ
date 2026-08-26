@@ -17,6 +17,12 @@ openpyxl
 optuna
 xgboost
 
+fastapi
+uvicorn
+pydantic
+joblib
+
+
 #mlflow==2.1.1
 
 python-dotenv
