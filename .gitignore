@@ -5,7 +5,7 @@ raw_data/
 __pycache__/
 *.py[codz]
 *$py.class
-
+*.img
 # C extensions
 *.so
 *.csv

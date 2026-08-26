@@ -16,6 +16,7 @@ db-dtypes
 openpyxl
 optuna
 xgboost
+opencv-python
 
 #mlflow==2.1.1
 
