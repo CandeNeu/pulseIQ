@@ -11,14 +11,9 @@ def main():
     model_hypertension, predict_hypertension = train_model(XGBClassifier, X_scaled, y_hypertensive, CONFIG_HYPERTENSION)
     model_cv, predict_cv = train_model(XGBClassifier, X_scaled, y_cv, CONFIG_CV)
 
-    print(f' Diabetes Scoring {predict_diabetes.mean()}')
-    print(f' hypertension Scoring {predict_hypertension.mean()}')
-    print(f' CardioVascular Disease Scoring {predict_cv.mean()}')
-
-
-
-
-
+    print(f' Diabetes  prob % {predict_diabetes.mean()*100}')
+    print(f' hypertension  prob % {predict_hypertension.mean()*100}')
+    print(f' CardioVascular Disease  prob % {predict_cv.mean()*100}')
 
 
 
