@@ -46,9 +46,11 @@ def preprocess(df1: pd.DataFrame)-> pd.DataFrame:
 
     #scaling and getting our target
 
-    X_scaled = scaler.set_output(transform='pandas').fit_transform(df1[['age', 'pulse_rate', 'height', 'weight', 'bmi']])
+    X = df1[['age', 'pulse_rate', 'height', 'weight', 'bmi']]
+   # X_scaled = scaler.set_output(transform='pandas').fit_transform(df1[['age', 'pulse_rate', 'height', 'weight', 'bmi']])
+   # (XGB NO NECESITA SCALE; por eso!)
     y_diabetic = df1['diabetic']
     y_hypertensive = df1['hypertensive']
     y_cv = df1['cardiovascular_disease']
 
-    return df1, X_scaled, y_diabetic, y_hypertensive, y_cv
+    return df1, X, y_diabetic, y_hypertensive, y_cv
