@@ -2,6 +2,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
 
+
 def train_model(model_class, X, y, params):
     skf = StratifiedKFold(n_splits=5)
     scores = []

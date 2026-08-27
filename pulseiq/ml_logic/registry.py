@@ -1,15 +1,13 @@
 from xgboost import XGBClassifier
-from pathlib import Path
+import os
 
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-FRONTEND_DIR = BASE_DIR / "frontend"
-FRONTEND_DIR.mkdir(parents=True, exist_ok=True)
+MODELS_DIR = "models"
+os.makedirs(MODELS_DIR, exist_ok=True)
 
 
 def save_model(model, name):
-    model_path = FRONTEND_DIR / f"XGBoost_{name}.json"
-    config_path = FRONTEND_DIR / f"config_{name}.json"
+    model_path = MODELS_DIR / f"XGBoost_{name}.json"
+    config_path = MODELS_DIR / f"config_{name}.json"
 
     model.get_booster().save_model(str(model_path))
 
@@ -19,9 +17,10 @@ def save_model(model, name):
 
     return model_path, config_path
 
+
 def load_model(name):
-    model_path = FRONTEND_DIR / f"XGBoost_{name}.json"
-    config_path = FRONTEND_DIR / f"config_{name}.json"
+    model_path = os.path.join(MODELS_DIR, f"XGBoost_{name}.json")
+    config_path = os.path.join(MODELS_DIR, f"config_{name}.json")
 
     model = XGBClassifier()
     model.load_model(str(model_path))
