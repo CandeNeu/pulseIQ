@@ -26,6 +26,7 @@ def load_model(name):
     model_path = os.path.join(MODELS_DIR, f"XGBoost_{name}.json")
     config_path = os.path.join(MODELS_DIR, f"config_{name}.json")
 
+
     # 1. Load the hyperparameters to set up the wrapper
     with open(config_path, "r") as f:
         params = json.load(f)
