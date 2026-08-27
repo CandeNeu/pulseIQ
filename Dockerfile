@@ -1,10 +1,10 @@
 FROM python:3.11-slim
 
 
-COPY requirements.txt .
 COPY setup.py .
 COPY pulseiq/ pulseiq
 COPY models/ models
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Cloud Run provides $PORT (defaults to 8080).
