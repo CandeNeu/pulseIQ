@@ -1,14 +1,13 @@
 from xgboost import XGBClassifier
-<<<<<<< HEAD
+
+import json
+from pulseiq.params import *
+
 import os
 
 MODELS_DIR = "models"
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-=======
-import json
-from pulseiq.params import *
->>>>>>> feat_main
 
 def save_model(model, name):
     model_path = MODELS_DIR / f"XGBoost_{name}.json"
