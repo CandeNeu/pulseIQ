@@ -1,22 +1,27 @@
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+from sklearn.model_selection import StratifiedKFold
 
-def clean_data(df: pd.DataFrame)-> pd.DataFrame:
+def download_clean_data(url):
+    df = pd.read_csv(url)
+        #Drop columns
+    df1 = df.drop(columns=['systolic_bp',
+                               'diastolic_bp',
+                               'family_diabetes',
+                               'family_hypertension',
+                               'glucose',
+                               'stroke'])
+
+    return df1
+
+def preprocess(df1: pd.DataFrame)-> pd.DataFrame:
     '''
     Cleaning the data and preprocessing
     '''
-    #Drop columns
-    df1 = df.drop(columns=['systolic_bp',
-                           'diastolic_bp',
-                           'family_diabetes',
-                           'family_hypertension',
-                           'glucose',
-                           'stroke'])
 
         #Binaryzing Diabetes to 0 = Normal and 1 = Diabetes
 
-    df1 = clean_data()
     map_diabetes = {
         'No': 0,
         'Yes': 1

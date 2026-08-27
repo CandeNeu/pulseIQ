@@ -3,8 +3,7 @@ from typing import Optional
 
 import joblib
 import pandas as pd
-
-MODEL_PATH = os.environ.get("MODEL_PATH", "models/model.joblib")
+from pulseiq.params import *
 
 # Kolumnordningen MÅSTE matcha träningen exakt
 FEATURE_ORDER = [
