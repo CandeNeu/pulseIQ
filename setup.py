@@ -5,8 +5,8 @@ with open("requirements.txt") as f:
     content = f.readlines()
 requirements = [x.strip() for x in content if "git+" not in x]
 
-setup(name='PulseIQ',
-      version="0.0.10",
+setup(name='pulseiq',
+      version="0.1.0",
       description="PulseIQ",
       license="MIT",
       author="Le Wagon",
