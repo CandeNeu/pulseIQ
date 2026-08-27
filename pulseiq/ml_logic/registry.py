@@ -1,31 +1,38 @@
 from xgboost import XGBClassifier
+<<<<<<< HEAD
 import os
 
 MODELS_DIR = "models"
 os.makedirs(MODELS_DIR, exist_ok=True)
 
+=======
+import json
+from pulseiq.params import *
+>>>>>>> feat_main
 
 def save_model(model, name):
     model_path = MODELS_DIR / f"XGBoost_{name}.json"
     config_path = MODELS_DIR / f"config_{name}.json"
 
-    model.get_booster().save_model(str(model_path))
+    # 1. Save the trained binary/booster model
+    model.save_model(str(model_path))
 
-    config_str = model.get_booster().save_config()
+    # 2. Save the initialization hyperparameters dictionary
+    params = model.get_params()
     with open(config_path, "w") as f:
-        f.write(config_str)
-
-    return model_path, config_path
+        json.dump(params, f, indent=4)
 
 
 def load_model(name):
     model_path = os.path.join(MODELS_DIR, f"XGBoost_{name}.json")
     config_path = os.path.join(MODELS_DIR, f"config_{name}.json")
 
-    model = XGBClassifier()
-    model.load_model(str(model_path))
+    # 1. Load the hyperparameters to set up the wrapper
+    with open(config_path, "r") as f:
+        params = json.load(f)
 
-    with open(config_path) as f:
-        model.get_booster().load_config(f.read())
+    # 2. Instantiate with parameters and load trained weights
+    model = XGBClassifier(**params)
+    model.load_model(str(model_path))
 
     return model

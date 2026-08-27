@@ -1,9 +1,18 @@
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split
+import json
+from pathlib import Path
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
+from pulseiq.params import *
 
 
 def train_model(model_class, X, y, params):
+    if isinstance(params, (str, Path)):
+        config_file = FRONTEND_DIR / params if isinstance(params, str) and not Path(params).is_absolute() else params
+        with open(config_file, "r") as f:
+            params = json.load(f)
+
     skf = StratifiedKFold(n_splits=5)
     scores = []
     fitted_models = []
@@ -26,8 +35,13 @@ def train_model(model_class, X, y, params):
 
     print(f"Mean AUC: {np.mean(scores):.4f}")
 
-    # Devolvés, por ejemplo, el modelo del último fold, o reentrenás con todo el dataset
-    final_model = model_class(**params)
-    final_model.fit(X, y)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, train_size=0.7, random_state=42, stratify=y
+    )
 
-    return final_model
+    final_model = model_class(**params)
+    final_model.fit(X_train, y_train)
+
+    predict = final_model.predict(X_test)
+
+    return final_model, predict
