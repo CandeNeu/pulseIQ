@@ -13,8 +13,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Ladda modellen EN gång när API:et startar ---
-# JUSTERA sökvägen till din faktiska modellfil (se ls models/)
 app.state.model = joblib.load("models/model.joblib")
 
 
