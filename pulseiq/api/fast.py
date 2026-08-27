@@ -2,18 +2,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+import pandas as pd
 
-from pulseiq.ml_logic.model import load_model, get_model, DiabetesModel
 from pulseiq.api.schemas import PatientFeatures
+from pulseiq.ml_logic.registry import load_model
 
+app = FastAPI()
+app.state.diabetic = load_model("diabetic")
+app.state.hypertensive = load_model("hypertensive")
+app.state.cv = load_model("cv")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    load_model()          # laddas en gång vid startup
-    yield
-
-
-app = FastAPI(title="PulseIQ API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,15 +27,23 @@ def root():
     return {"status": "ok", "message": "PulseIQ API is running"}
 
 
-@app.get("/health")
-def health():
-    from pulseiq.ml_logic import model
-    return {"model_loaded": model._model is not None}
-
-
 @app.get("/predict")
-def predict(
+def predict_diabetis(
     features: PatientFeatures = Depends(),
-    model: DiabetesModel = Depends(get_model),
 ):
-    return model.predict(features.model_dump())
+    diabetic_model = app.state.diabetic
+    y = pd.DataFrame(features.model_dump(), index=[0])
+    diabetic_prediction = int(diabetic_model.predict(y)[0])
+
+    hypertensive_model = app.state.hypertensive
+
+    hypertensive_prediction = int(hypertensive_model.predict(y)[0])
+
+    cv_model = app.state.cv
+    cv_prediction = int(cv_model.predict(y)[0])
+
+    return {
+        "diabetic": diabetic_prediction,
+        "hypertensive": hypertensive_prediction,
+        "cv": cv_prediction,
+    }

@@ -6,6 +6,7 @@ from sklearn.model_selection import StratifiedKFold
 import numpy as np
 from pulseiq.params import *
 
+
 def train_model(model_class, X, y, params):
     if isinstance(params, (str, Path)):
         config_file = FRONTEND_DIR / params if isinstance(params, str) and not Path(params).is_absolute() else params

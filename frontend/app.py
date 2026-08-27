@@ -8,9 +8,13 @@ from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
-st.set_page_config(page_title="PulseIQ – Diabetes Risk", page_icon="🩺", layout="centered")
+st.set_page_config(
+    page_title="PulseIQ – Diabetes Risk", page_icon="🩺", layout="centered"
+)
 
-API_URL = os.environ.get("API_URL", "http://localhost:8000/predict")
+API_URL = os.environ.get(
+    "API_URL", "https://pulseiq-api-431111687933.europe-west1.run.app/predict"
+)
 
 st.title("🩺 PulseIQ – Diabetes Risk Prediction")
 st.markdown("Enter the patient's details to get a prediction from the model.")
@@ -50,8 +54,10 @@ def compute_bpm(signal, fps=30.0):
 
 
 with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
-    st.caption("Cover the camera lens with your fingertip and hold still. "
-               "The measured pulse will fill in the Pulse rate field below.")
+    st.caption(
+        "Cover the camera lens with your fingertip and hold still. "
+        "The measured pulse will fill in the Pulse rate field below."
+    )
     col_cam, col_graph = st.columns(2)
     with col_cam:
         ctx = webrtc_streamer(
@@ -88,10 +94,16 @@ with col1:
     age = st.number_input("Age", min_value=0, max_value=120, value=42)
     gender = st.selectbox("Gender", ["Female", "Male"])
     # Default value becomes the measured pulse if available
-    default_pulse = int(st.session_state.measured_bpm) if st.session_state.measured_bpm else 66
-    pulse_rate = st.number_input("Pulse rate", min_value=30, max_value=200, value=default_pulse)
+    default_pulse = (
+        int(st.session_state.measured_bpm) if st.session_state.measured_bpm else 66
+    )
+    pulse_rate = st.number_input(
+        "Pulse rate", min_value=30, max_value=200, value=default_pulse
+    )
     systolic_bp = st.number_input("Systolic BP", min_value=70, max_value=250, value=110)
-    diastolic_bp = st.number_input("Diastolic BP", min_value=40, max_value=150, value=73)
+    diastolic_bp = st.number_input(
+        "Diastolic BP", min_value=40, max_value=150, value=73
+    )
     glucose = st.number_input("Glucose", min_value=2.0, max_value=30.0, value=5.88)
     height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=1.65)
 with col2:
@@ -103,7 +115,7 @@ with col2:
     stroke = st.selectbox("Stroke", ["No", "Yes"])
 
 # BMI is calculated automatically from height and weight
-bmi = round(weight / (height ** 2), 2) if height > 0 else 0.0
+bmi = round(weight / (height**2), 2) if height > 0 else 0.0
 st.metric("BMI (auto-calculated)", bmi)
 
 params = {
