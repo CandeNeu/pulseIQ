@@ -10,8 +10,8 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 
 
 def save_model(model, name):
-    model_path = MODELS_DIR / f"XGBoost_{name}.json"
-    config_path = MODELS_DIR / f"config_{name}.json"
+    model_path = os.path.join(MODELS_DIR,f"XGBoost_{name}.json")
+    config_path = os.path.join(MODELS_DIR, f"config_{name}.json")
 
     # 1. Save the trained binary/booster model
     model.save_model(str(model_path))
@@ -25,6 +25,7 @@ def save_model(model, name):
 def load_model(name):
     model_path = os.path.join(MODELS_DIR, f"XGBoost_{name}.json")
     config_path = os.path.join(MODELS_DIR, f"config_{name}.json")
+
 
     # 1. Load the hyperparameters to set up the wrapper
     with open(config_path, "r") as f:

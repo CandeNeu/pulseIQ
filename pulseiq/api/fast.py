@@ -8,6 +8,8 @@ from pulseiq.api.schemas import PatientFeatures
 from pulseiq.ml_logic.registry import load_model
 
 app = FastAPI()
+
+
 app.state.diabetic = load_model("diabetic")
 app.state.hypertensive = load_model("hypertensive")
 app.state.cv = load_model("cv")
@@ -32,15 +34,15 @@ def predict_diabetis(
     features: PatientFeatures = Depends(),
 ):
     diabetic_model = app.state.diabetic
-    y = pd.DataFrame(features.model_dump(), index=[0])
-    diabetic_prediction = int(diabetic_model.predict(y)[0])
+    data = pd.DataFrame(features.model_dump(), index=[0])
+    diabetic_prediction = int(diabetic_model.predict(data)[0])
 
     hypertensive_model = app.state.hypertensive
 
-    hypertensive_prediction = int(hypertensive_model.predict(y)[0])
+    hypertensive_prediction = int(hypertensive_model.predict(data)[0])
 
     cv_model = app.state.cv
-    cv_prediction = int(cv_model.predict(y)[0])
+    cv_prediction = int(cv_model.predict(data)[0])
 
     return {
         "diabetic": diabetic_prediction,
