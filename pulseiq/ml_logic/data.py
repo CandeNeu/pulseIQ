@@ -8,8 +8,6 @@ def download_clean_data(url):
         #Drop columns
     df1 = df.drop(columns=['systolic_bp',
                                'diastolic_bp',
-                               'family_diabetes',
-                               'family_hypertension',
                                'glucose',
                                'stroke'])
 
