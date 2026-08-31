@@ -198,21 +198,6 @@ with tab1:
         ever_smoked = st.selectbox("Ever smoked?", ["Yes", "No"])
         current_smoker = st.selectbox("Current smoker?", ["Yes", "No"])
 
-    with col_vitals:
-        st.markdown("**Vital signs**")
-        systolic_bp = st.number_input("Systolic BP", value=106)
-        diastolic_bp = st.number_input("Diastolic BP", value=67)
-        glucose = st.number_input("Glucose", value=5.81)
-
-    with col_history:
-        st.markdown("**Medical history**")
-        family_diabetes = st.selectbox("Family history of diabetes", ["No", "Yes"])
-        hypertensive = st.selectbox("Hypertensive", ["No", "Yes"])
-        family_hypertension = st.selectbox(
-            "Family history of hypertension", ["No", "Yes"]
-        )
-        cardiovascular = st.selectbox("Cardiovascular disease", ["No", "Yes"])
-        stroke = st.selectbox("Stroke", ["No", "Yes"])
 
 # ==========================================
 # TAB 2: PULSE MEASUREMENT
