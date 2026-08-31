@@ -149,7 +149,7 @@ Model predictions (1 = at risk, 0 = not at risk):
 - Cardiovascular: {predictions['cv']}
 """
 
-        body = {
+    body = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 500},
     }
@@ -163,7 +163,7 @@ Model predictions (1 = at risk, 0 = not at risk):
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
             if status in (503, 429) and attempt < 2:
-                time.sleep(2)      # wait and retry on overload / rate limit
+                time.sleep(2)  # wait and retry on overload / rate limit
                 continue
             return "The recommendation service is busy right now. Please try again in a moment."
         except (KeyError, IndexError):
