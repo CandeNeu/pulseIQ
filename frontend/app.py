@@ -194,6 +194,7 @@ with tab1:
         )
         bmi = round(weight / (height**2), 2) if height > 0 else 0.0
         st.metric(label="Calculated BMI", value=bmi)
+
         ever_smoked = st.selectbox("Ever smoked?", ["Yes", "No"])
         current_smoker = st.selectbox("Current smoker?", ["Yes", "No"])
 
@@ -331,7 +332,7 @@ with tab3:
                 "height": float(height or 0.0),
                 "weight": float(weight or 0.0),
                 "bmi": float(bmi or 0.0),
-                "pulse": float(pulse or 0.0),
+                "pulse": float(pulse_rate or 0.0),
                 "ever_smoked": 1 if ever_smoked == "Yes" else 0,
                 "current_smoker": 1 if current_smoker == "Yes" else 0,
             }
