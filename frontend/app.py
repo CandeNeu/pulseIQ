@@ -9,10 +9,10 @@ import imageio.v3 as iio
 from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 # ============ Environment / secrets ============
-load_dotenv()  # reads a local .env file (never commit it to GitHub)
+load_dotenv(find_dotenv())  # finds .env even from the frontend/ folder; never commit it
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 API_URL = os.environ.get(
@@ -122,15 +122,17 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 def get_gemini_recommendation(patient, predictions):
     """Ask Gemini for a lifestyle recommendation based on the patient + predictions.
 
-    Returns the recommendation text, or an error string.
+    Returns the recommendation text, or an error string. The API key is sent in a
+    header (never in the URL) so it can't leak into error messages.
     """
     if not GEMINI_API_KEY:
-        return "⚠️ No GEMINI_API_KEY found. Add it to your .env file to enable recommendations."
+        return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY
+        "gemini-2.5-flash:generateContent"
     )
+    headers = {"x-goog-api-key": GEMINI_API_KEY}
 
     prompt = f"""You are a helpful health assistant. Based on the patient data and
 model predictions below, write a short, friendly set of lifestyle recommendations
@@ -150,12 +152,12 @@ Model predictions (1 = at risk, 0 = not at risk):
     body = {"contents": [{"parts": [{"text": prompt}]}]}
 
     try:
-        resp = requests.post(url, json=body, timeout=30)
+        resp = requests.post(url, headers=headers, json=body, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         return data["candidates"][0]["content"]["parts"][0]["text"]
-    except requests.exceptions.RequestException as e:
-        return f"Could not reach Gemini: {e}"
+    except requests.exceptions.RequestException:
+        return "Could not reach Gemini. Check the model name and API key."
     except (KeyError, IndexError):
         return "Gemini returned an unexpected response."
 
