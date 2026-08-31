@@ -318,24 +318,27 @@ with tab3:
         use_container_width=True,
         disabled=(pulse_rate is None),
     )
+    # 1. Capture the inputs from your UI first (Streamlit example)
+    pulse = st.text_input("Enter pulse:")
+    ever_smoked = st.selectbox("Ever smoked?", ["Yes", "No"])
+    current_smoker = st.selectbox("Current smoker?", ["Yes", "No"])
 
     if predict_clicked:
-        params = {
-            "age": age,
-            "gender": gender,
-            "pulse_rate": pulse_rate,
-            "systolic_bp": systolic_bp,
-            "diastolic_bp": diastolic_bp,
-            "glucose": glucose,
-            "height": height,
-            "weight": weight,
-            "bmi": bmi,
-            "family_diabetes": 1 if family_diabetes == "Yes" else 0,
-            "hypertensive": 1 if hypertensive == "Yes" else 0,
-            "family_hypertension": 1 if family_hypertension == "Yes" else 0,
-            "cardiovascular_disease": 1 if cardiovascular == "Yes" else 0,
-            "stroke": 1 if stroke == "Yes" else 0,
-        }
+        try:
+            params = {
+                "sex": 1 if gender == "Male" else 0,
+                "age": int(age or 0),
+                "pulse_rate": int(pulse_rate or 0),
+                "height": float(height or 0.0),
+                "weight": float(weight or 0.0),
+                "bmi": float(bmi or 0.0),
+                "pulse": float(pulse or 0.0),
+                "ever_smoked": 1 if ever_smoked == "Yes" else 0,
+                "current_smoker": 1 if current_smoker == "Yes" else 0,
+            }
+            # Run your prediction here
+        except ValueError:
+            print("Please ensure all numeric fields are filled out correctly.")
 
         with st.spinner("Analysing via API..."):
             try:

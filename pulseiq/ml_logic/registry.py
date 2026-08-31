@@ -22,9 +22,9 @@ def save_model(model, params: dict, model_name: str, target: str) -> None:
     print(f"✅ Artefactos guardados: [{model_name}_{target}] en {MODELS_DIR}/")
 
 
-def load_model(model_name: str, target: str):
+def load_model(target: str):
     """Carga el modelo entrenado (.pkl)."""
-    model_path = os.path.join(MODELS_DIR, f"{model_name}_{target}.pkl")
+    model_path = os.path.join(MODELS_DIR, f"XGBoost_{target}.pkl")
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"No model found at path: {model_path}")
 
@@ -51,7 +51,19 @@ def load_model_from_bucket(target):
     blob.download_to_filename(model_path)
 
 
-if __name__ == "__main__":
+def save_model_into_bucket(model, target):
+    model_path = os.path.join(MODELS_DIR, f"XGBoost_{target}.pkl")
+   #params_path = os.path.join(MODELS_DIR, f"params_XGBoost_{target}.json")
+    with open(model_path, "wb") as f:
+            pickle.dump(model, f)
 
+    client = storage.Client()
+    bucket = client.get_bucket(BUCKET_NAME)
+    blob = bucket.blob(f"XGBoost_{target}.pkl")
+    blob.upload_from_filename(model_path)
+
+
+if __name__ == "__main__":
+    save_model_into_bucket(DIABETES_SYNTAXIS)
     load_model_from_bucket(DIABETES_SYNTAXIS)
     load_model_from_bucket(HYPERTENSIVE_SYNTAXIS)
