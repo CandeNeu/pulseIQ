@@ -4,8 +4,9 @@ from pathlib import Path
 HOME_PATH= os.path.expanduser("~")
 
 DATABASE_URL = 'https://data.mendeley.com/public-files/datasets/m8cgwxs9s6/files/4c109a9f-2462-4dce-b93c-5789168c5401/file_downloaded'
-DATABASE_PATH = os.path.join(HOME_PATH,"code/pulseIQ/raw_data/DiaBD_A Diabetes Dataset for Enhanced Risk Analysis and Research in Bangladesh.csv")
-#DATABASE_PATH = "/home/candelaneumann/code/CandeNeu/pulseIQ/raw_data/DiaBD_A Diabetes Dataset for Enhanced Risk Analysis and Research in Bangladesh.csv"
+DATABASE_PATH = os.path.join(HOME_PATH,"code/CandeNeu/pulseIQ/raw_data/DEMO_J.xpt")
+DATABASE_PATH = "/home/candelaneumann/code/CandeNeu/pulseIQ/raw_data/DEMO_J.xpt"
+
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = BASE_DIR / "frontend"
