@@ -110,6 +110,9 @@ if video:
 
         if bpm:
             st.session_state.measured_bpm = bpm
+            st.session_state.pulse_rate_input = int(
+                bpm
+            )  # ← push into the Pulse rate field
             st.metric("Measured pulse", f"{bpm} bpm")
 
             # 1) The heartbeat over time (slow drift removed)
@@ -168,12 +171,11 @@ col1, col2 = st.columns(2)
 with col1:
     age = st.number_input("Age", min_value=0, max_value=120, value=42)
     gender = st.selectbox("Gender", ["Female", "Male"])
-    # Default value becomes the measured pulse if available
-    default_pulse = (
-        int(st.session_state.measured_bpm) if st.session_state.measured_bpm else 66
-    )
+    # Pulse rate is bound to a session key so the video result can fill it in
+    if "pulse_rate_input" not in st.session_state:
+        st.session_state.pulse_rate_input = 66
     pulse_rate = st.number_input(
-        "Pulse rate", min_value=30, max_value=200, value=default_pulse
+        "Pulse rate", min_value=30, max_value=200, key="pulse_rate_input"
     )
     systolic_bp = st.number_input("Systolic BP", min_value=70, max_value=250, value=110)
     diastolic_bp = st.number_input(
