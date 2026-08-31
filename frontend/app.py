@@ -20,7 +20,7 @@ API_URL = os.environ.get(
 
 st.title("🩺 PulseIQ – Diabetes Risk Prediction")
 st.markdown(
-    "**Step 1** – enter the patient's details. "
+    "**Step 1** – fill in every patient detail. "
     "**Step 2** – measure the pulse from a video. "
     "**Step 3** – get the prediction."
 )
@@ -91,46 +91,102 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 # =====================================================================
-# STEP 1 — Patient details (must be filled before video is unlocked)
+# STEP 1 — Patient details (all fields start empty and are required)
 # =====================================================================
 st.header("1️⃣ Patient details")
 
 col1, col2 = st.columns(2)
 with col1:
-    age = st.number_input("Age", min_value=0, max_value=120, value=42)
-    gender = st.selectbox("Gender", ["Female", "Male"])
-    systolic_bp = st.number_input("Systolic BP", min_value=70, max_value=250, value=110)
-    diastolic_bp = st.number_input(
-        "Diastolic BP", min_value=40, max_value=150, value=73
+    age = st.number_input(
+        "Age", min_value=0, max_value=120, value=None, placeholder="Enter age"
     )
-    glucose = st.number_input("Glucose", min_value=2.0, max_value=30.0, value=5.88)
-    height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=1.65)
+    gender = st.selectbox(
+        "Gender", ["Female", "Male"], index=None, placeholder="Select gender"
+    )
+    systolic_bp = st.number_input(
+        "Systolic BP",
+        min_value=70,
+        max_value=250,
+        value=None,
+        placeholder="Enter value",
+    )
+    diastolic_bp = st.number_input(
+        "Diastolic BP",
+        min_value=40,
+        max_value=150,
+        value=None,
+        placeholder="Enter value",
+    )
+    glucose = st.number_input(
+        "Glucose", min_value=2.0, max_value=30.0, value=None, placeholder="Enter value"
+    )
+    height = st.number_input(
+        "Height (m)",
+        min_value=1.0,
+        max_value=2.5,
+        value=None,
+        placeholder="Enter height",
+    )
 with col2:
-    weight = st.number_input("Weight (kg)", min_value=20.0, max_value=250.0, value=70.2)
-    family_diabetes = st.selectbox("Family history of diabetes", ["No", "Yes"])
-    hypertensive = st.selectbox("Hypertensive", ["No", "Yes"])
-    family_hypertension = st.selectbox("Family history of hypertension", ["No", "Yes"])
-    cardiovascular_disease = st.selectbox("Cardiovascular disease", ["No", "Yes"])
-    stroke = st.selectbox("Stroke", ["No", "Yes"])
+    weight = st.number_input(
+        "Weight (kg)",
+        min_value=20.0,
+        max_value=250.0,
+        value=None,
+        placeholder="Enter weight",
+    )
+    family_diabetes = st.selectbox(
+        "Family history of diabetes", ["No", "Yes"], index=None, placeholder="Select"
+    )
+    hypertensive = st.selectbox(
+        "Hypertensive", ["No", "Yes"], index=None, placeholder="Select"
+    )
+    family_hypertension = st.selectbox(
+        "Family history of hypertension",
+        ["No", "Yes"],
+        index=None,
+        placeholder="Select",
+    )
+    cardiovascular_disease = st.selectbox(
+        "Cardiovascular disease", ["No", "Yes"], index=None, placeholder="Select"
+    )
+    stroke = st.selectbox("Stroke", ["No", "Yes"], index=None, placeholder="Select")
 
-# BMI is calculated automatically from height and weight
-bmi = round(weight / (height**2), 2) if height > 0 else 0.0
-st.metric("BMI (auto-calculated)", bmi)
+# BMI is calculated automatically once height and weight are entered
+if height and weight:
+    bmi = round(weight / (height**2), 2)
+    st.metric("BMI (auto-calculated)", bmi)
+else:
+    bmi = None
+    st.caption("BMI will be calculated once height and weight are entered.")
 
-# Gate: the video stays locked until this is ticked
-details_done = st.checkbox(
-    "✅ I have entered all the patient's details above", value=False
-)
+# All fields must be filled before the video unlocks
+required_fields = {
+    "Age": age,
+    "Gender": gender,
+    "Systolic BP": systolic_bp,
+    "Diastolic BP": diastolic_bp,
+    "Glucose": glucose,
+    "Height": height,
+    "Weight": weight,
+    "Family history of diabetes": family_diabetes,
+    "Hypertensive": hypertensive,
+    "Family history of hypertension": family_hypertension,
+    "Cardiovascular disease": cardiovascular_disease,
+    "Stroke": stroke,
+}
+missing = [name for name, val in required_fields.items() if val is None]
+details_done = len(missing) == 0
 
 # =====================================================================
-# STEP 2 — Measure pulse from a video (locked until step 1 is confirmed)
+# STEP 2 — Measure pulse (locked until every field above is filled)
 # =====================================================================
 st.header("2️⃣ Measure pulse")
 
 if not details_done:
-    st.info(
-        "Fill in the patient's details above, then tick the box to unlock "
-        "pulse measurement."
+    st.warning(
+        "Please fill in all patient details to unlock pulse measurement. "
+        "Still missing: " + ", ".join(missing)
     )
 else:
     st.caption(
@@ -208,7 +264,7 @@ else:
                 time.sleep(0.3)
 
 # =====================================================================
-# STEP 3 — Predict (needs both the details and a measured pulse)
+# STEP 3 — Predict (needs all details filled AND a measured pulse)
 # =====================================================================
 st.header("3️⃣ Predict")
 
