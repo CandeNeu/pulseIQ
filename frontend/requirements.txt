@@ -8,3 +8,4 @@ scipy
 requests
 xgboost
 imageio
+python-dotenv

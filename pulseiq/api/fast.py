@@ -34,14 +34,14 @@ def predict_diabetis(
 ):
     diabetic_model = app.state.diabetic
     data = pd.DataFrame(features.model_dump(), index=[0])
-    diabetic_prediction = int(diabetic_model.predict(data)[0])
+    diabetic_prediction = float(diabetic_model.predict(data)[0])
 
     hypertensive_model = app.state.hypertensive
 
-    hypertensive_prediction = int(hypertensive_model.predict(data)[0])
+    hypertensive_prediction = float(hypertensive_model.predict(data)[0])
 
     cv_model = app.state.cv
-    cv_prediction = int(cv_model.predict(data)[0])
+    cv_prediction = float(cv_model.predict(data)[0])
 
     return {
         "diabetic": diabetic_prediction,
