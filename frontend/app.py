@@ -130,7 +130,7 @@ def get_gemini_recommendation(patient, predictions):
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-2.5-flash:generateContent"
+        "gemini-3.6-flash:generateContent"
     )
     headers = {"x-goog-api-key": GEMINI_API_KEY}
 
