@@ -119,51 +119,52 @@ def extract_signal_from_video(video_bytes, max_frames=300):
     return signal, fps
 
 
-def get_gemini_recommendation(patient, predictions):
-    """Ask Gemini for a lifestyle recommendation based on the patient + predictions.
+@st.cache_data(show_spinner=False)
+def get_gemini_recommendation(diabetic, hypertensive, age, bmi, glucose, pulse):
+    """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation.
 
-    Returns the recommendation text, or an error string. The API key is sent in a
-    header (never in the URL) so it can't leak into error messages. Retries a few
-    times on transient errors (503 overloaded / 429 rate limited).
+    Cached: identical inputs return instantly without another API call. Scalar
+    args (not a dict) so Streamlit can hash them for the cache. The API key is
+    sent in a header (never in the URL). Retries on transient 503/429.
     """
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-3.6-flash:generateContent"
+        "gemini-3.5-flash-lite:generateContent"
     )
     headers = {"x-goog-api-key": GEMINI_API_KEY}
 
-    prompt = f"""You are a helpful health assistant. Based on the patient data and
-model predictions below, write a short, friendly set of lifestyle recommendations
-(diet, exercise, monitoring, and when to see a doctor). Do NOT give a diagnosis.
-Keep it to 4-6 concise bullet points and add a one-line disclaimer that this is not
-medical advice.
+    prompt = f"""You are a helpful health assistant. Based on the data below, write a
+short, friendly set of lifestyle recommendations (diet, exercise, monitoring, and
+when to see a doctor). Do NOT give a diagnosis. Keep it to 4-6 concise bullet points
+and add a one-line disclaimer that this is not medical advice.
 
-Patient data:
-{patient}
-
+Patient: age {age}, BMI {bmi}, glucose {glucose}, resting pulse {pulse} bpm.
 Model predictions (1 = at risk, 0 = not at risk):
-- Diabetic: {predictions['diabetic']}
-- Hypertensive: {predictions['hypertensive']}
+- Diabetic: {diabetic}
+- Hypertensive: {hypertensive}
 """
 
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 500},
+        "generationConfig": {
+            "maxOutputTokens": 400,
+            "thinkingConfig": {"thinkingBudget": 0},  # 0 = no thinking -> fastest
+        },
     }
 
-    for attempt in range(3):  # retry up to 3 times on transient errors
+    for attempt in range(3):  # retry on transient overload / rate limit
         try:
-            resp = requests.post(url, headers=headers, json=body, timeout=90)
+            resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
             if status in (503, 429) and attempt < 2:
-                time.sleep(2)  # wait and retry on overload / rate limit
+                time.sleep(2)
                 continue
             return "The recommendation service is busy right now. Please try again in a moment."
         except (KeyError, IndexError):
@@ -360,26 +361,31 @@ with tab3:
 
         # The API returns {"diabetic": 0/1, "hypertensive": 0/1, "cv": 0/1};
         # cardiovascular (cv) is intentionally not shown.
-        predictions = {
-            "diabetic": result.get("diabetic", 0),
-            "hypertensive": result.get("hypertensive", 0),
-        }
+        diabetic = result.get("diabetic", 0)
+        hypertensive_pred = result.get("hypertensive", 0)
 
         def label(v):
             return "⚠️ At risk" if str(v) in ("1", "yes", "Yes") else "✅ Not at risk"
 
         res_col1, res_col2 = st.columns(2)
-        res_col1.metric("Diabetes", label(predictions["diabetic"]))
-        res_col2.metric("Hypertension", label(predictions["hypertensive"]))
+        res_col1.metric("Diabetes", label(diabetic))
+        res_col2.metric("Hypertension", label(hypertensive_pred))
 
         with st.expander("Raw API response"):
             st.write(result)
 
-        # -------- Gemini recommendation --------
+        # -------- Gemini recommendation (fast, cached) --------
         st.markdown("---")
         st.markdown("### 🤖 Personalised recommendation")
 
         with st.spinner("Generating recommendation..."):
-            recommendation = get_gemini_recommendation(params, predictions)
+            recommendation = get_gemini_recommendation(
+                diabetic=diabetic,
+                hypertensive=hypertensive_pred,
+                age=age,
+                bmi=bmi,
+                glucose=glucose,
+                pulse=pulse_rate,
+            )
 
         st.markdown(recommendation)
