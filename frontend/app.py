@@ -194,6 +194,8 @@ with tab1:
         )
         bmi = round(weight / (height**2), 2) if height > 0 else 0.0
         st.metric(label="Calculated BMI", value=bmi)
+        ever_smoked = st.selectbox("Ever smoked?", ["Yes", "No"])
+        current_smoker = st.selectbox("Current smoker?", ["Yes", "No"])
 
     with col_vitals:
         st.markdown("**Vital signs**")
@@ -319,9 +321,6 @@ with tab3:
         disabled=(pulse_rate is None),
     )
     # 1. Capture the inputs from your UI first (Streamlit example)
-    pulse = st.text_input("Enter pulse:")
-    ever_smoked = st.selectbox("Ever smoked?", ["Yes", "No"])
-    current_smoker = st.selectbox("Current smoker?", ["Yes", "No"])
 
     if predict_clicked:
         try:
