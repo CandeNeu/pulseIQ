@@ -3,7 +3,9 @@ import time
 import threading
 import requests
 import numpy as np
+import pandas as pd
 import streamlit as st
+import imageio.v3 as iio
 from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
@@ -19,7 +21,7 @@ API_URL = os.environ.get(
 st.title("🩺 PulseIQ – Diabetes Risk Prediction")
 st.markdown("Enter the patient's details to get a prediction from the model.")
 
-# ============ Live pulse measurement from camera ============
+# ============ Session state ============
 if "signal_buffer" not in st.session_state:
     st.session_state.signal_buffer = deque(maxlen=300)  # ~10s @ 30fps
 if "measured_bpm" not in st.session_state:
@@ -37,57 +39,130 @@ def video_frame_callback(frame):
 
 
 def compute_bpm(signal, fps=30.0):
-    """Estimates heart rate (bpm) from the brightness signal via bandpass + FFT."""
+    """Estimate heart rate from a brightness signal via bandpass + FFT.
+
+    Returns (bpm, filtered_signal, freqs_bpm, spectrum). The filtered signal is
+    the raw brightness with slow drift removed (the actual heartbeat ripple).
+    freqs_bpm/spectrum describe the frequency content, with the peak = pulse.
+    """
     signal = np.array(signal, dtype=np.float32)
     if len(signal) < fps * 3:
-        return None
+        return None, None, None, None
     signal = signal - signal.mean()
     low, high, nyq = 0.7, 4.0, fps / 2.0
     b, a = butter(3, [low / nyq, high / nyq], btype="band")
     filtered = filtfilt(b, a, signal)
+
     fft = np.abs(np.fft.rfft(filtered))
     freqs = np.fft.rfftfreq(len(filtered), d=1.0 / fps)
     valid = (freqs >= low) & (freqs <= high)
     if not valid.any():
-        return None
-    return round(freqs[valid][np.argmax(fft[valid])] * 60.0, 1)
+        return None, filtered, None, None
+
+    bpm = round(freqs[valid][np.argmax(fft[valid])] * 60.0, 1)
+    freqs_bpm = freqs[valid] * 60.0  # x-axis in beats per minute
+    spectrum = fft[valid]  # strength at each frequency
+    return bpm, filtered, freqs_bpm, spectrum
 
 
-with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
-    st.caption(
-        "Cover the camera lens with your fingertip and hold still. "
-        "The measured pulse will fill in the Pulse rate field below."
-    )
-    col_cam, col_graph = st.columns(2)
-    with col_cam:
-        ctx = webrtc_streamer(
-            key="pulse",
-            mode=WebRtcMode.SENDRECV,
-            video_frame_callback=video_frame_callback,
-            rtc_configuration={
-                "iceServers": [
-                    {"urls": ["stun:stun.l.google.com:19302"]},
-                ]
-            },
-            media_stream_constraints={"video": True, "audio": False},
-            async_processing=True,
+@st.cache_data(show_spinner=False)
+def extract_signal_from_video(video_bytes, max_frames=300):
+    """Read up to max_frames of red-channel brightness from the center of each frame.
+
+    Returns (signal, fps). imageio gives RGB, so the red channel is index 0.
+    Only a small center crop is averaged (where the fingertip covers the lens),
+    which is faster and gives a cleaner pulse signal.
+    """
+    try:
+        meta = iio.immeta(video_bytes, plugin="pyav")
+        fps = float(meta.get("fps", 30.0))
+    except Exception:
+        fps = 30.0
+
+    signal = []
+    for frame in iio.imiter(video_bytes, plugin="pyav"):
+        h, w, _ = frame.shape
+        cy, cx = h // 2, w // 2
+        crop = frame[cy - 50 : cy + 50, cx - 50 : cx + 50, 0]  # center, red channel
+        signal.append(float(crop.mean()))
+        if len(signal) >= max_frames:
+            break
+    return signal, fps
+
+
+# ============ Measure pulse from an uploaded video ============
+st.subheader("📤 Measure pulse from an uploaded video")
+st.caption(
+    "Upload a video where a fingertip covers the camera lens. "
+    "The red-channel signal is extracted, filtered, and the heart frequency plotted."
+)
+video = st.file_uploader("Upload a fingertip video", type=["mp4", "mov", "avi", "webm"])
+
+if video:
+    with st.spinner("Analysing video..."):
+        signal, fps = extract_signal_from_video(video.getvalue())
+
+    if len(signal) < 10:
+        st.warning("The video seems too short to analyse.")
+    else:
+        bpm, filtered, freqs_bpm, spectrum = compute_bpm(signal, fps=fps)
+        st.caption(f"Read {len(signal)} frames at ~{fps:.0f} fps")
+
+        if bpm:
+            st.session_state.measured_bpm = bpm
+            st.metric("Measured pulse", f"{bpm} bpm")
+
+            # 1) The heartbeat over time (slow drift removed)
+            st.caption("Filtered pulse signal (the heartbeat)")
+            st.line_chart(filtered)
+
+            # 2) The heart-frequency spectrum — the peak sits at the pulse
+            st.caption("Heart-rate frequency spectrum (peak = pulse)")
+            spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
+            st.line_chart(spectrum_df, x="bpm", y="strength")
+        else:
+            st.warning(
+                "Couldn't detect a clear pulse — hold the fingertip still on the "
+                "lens for a few seconds, or the lighting may have shifted too much."
+            )
+else:
+    # ============ Live camera – only shown when NO video is uploaded ============
+    with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
+        st.caption(
+            "Cover the camera lens with your fingertip and hold still. "
+            "The measured pulse will fill in the Pulse rate field below."
         )
-    with col_graph:
-        chart_ph = st.empty()
-        bpm_ph = st.empty()
+        col_cam, col_graph = st.columns(2)
+        with col_cam:
+            ctx = webrtc_streamer(
+                key="pulse",
+                mode=WebRtcMode.SENDRECV,
+                video_frame_callback=video_frame_callback,
+                rtc_configuration={
+                    "iceServers": [
+                        {"urls": ["stun:stun.l.google.com:19302"]},
+                    ]
+                },
+                media_stream_constraints={"video": True, "audio": False},
+                async_processing=True,
+            )
+        with col_graph:
+            chart_ph = st.empty()
+            bpm_ph = st.empty()
 
-    if ctx.state.playing:
-        while ctx.state.playing:
-            with lock:
-                data = list(signal_buffer)
-            if len(data) > 5:
-                chart_ph.line_chart(data)
-                bpm = compute_bpm(data)
-                if bpm:
-                    st.session_state.measured_bpm = bpm
-                    bpm_ph.metric("Measured pulse", f"{bpm} bpm")
-            time.sleep(0.3)
-# ============ End of camera block ============
+        if ctx.state.playing:
+            while ctx.state.playing:
+                with lock:
+                    data = list(signal_buffer)
+                if len(data) > 5:
+                    bpm, filtered, _, _ = compute_bpm(data)
+                    if filtered is not None:
+                        chart_ph.line_chart(filtered)
+                    if bpm:
+                        st.session_state.measured_bpm = bpm
+                        bpm_ph.metric("Measured pulse", f"{bpm} bpm")
+                time.sleep(0.3)
+# ============ End of pulse measurement ============
 
 col1, col2 = st.columns(2)
 with col1:
@@ -138,15 +213,26 @@ params = {
 if st.button("Predict risk", type="primary"):
     try:
         response = requests.get(API_URL, params=params)
-        response.raise_for_status()
-        result = response.json()
+
+        # Show what the server actually returned (helps diagnose non-JSON errors)
+        if response.status_code != 200:
+            st.error(f"API returned status {response.status_code}")
+            st.code(response.text)
+            st.stop()
+
+        try:
+            result = response.json()
+        except requests.exceptions.JSONDecodeError:
+            st.error("The API did not return valid JSON. Raw response below:")
+            st.code(response.text)
+            st.stop()
 
         pred = result.get("diabetic_prediction")
         if pred is not None:
             if str(pred).lower() in ("yes", "1"):
-                st.error(f"Prediction: Diabetic")
+                st.error("Prediction: Diabetic")
             else:
-                st.success(f"Prediction: Not diabetic")
+                st.success("Prediction: Not diabetic")
 
         risk = result.get("diabetic_risk")
         if risk is not None:
@@ -157,4 +243,3 @@ if st.button("Predict risk", type="primary"):
 
     except requests.exceptions.RequestException as e:
         st.error(f"Could not reach the API: {e}")
-        st.info(f"Checking URL: {API_URL}")
