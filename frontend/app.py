@@ -3,6 +3,7 @@ import time
 import threading
 import requests
 import numpy as np
+import pandas as pd
 import streamlit as st
 import imageio.v3 as iio
 from collections import deque
@@ -38,31 +39,40 @@ def video_frame_callback(frame):
 
 
 def compute_bpm(signal, fps=30.0):
-    """Estimates heart rate (bpm) from the brightness signal via bandpass + FFT."""
+    """Estimate heart rate from a brightness signal via bandpass + FFT.
+
+    Returns (bpm, filtered_signal, freqs_bpm, spectrum). The filtered signal is
+    the raw brightness with slow drift removed (the actual heartbeat ripple).
+    freqs_bpm/spectrum describe the frequency content, with the peak = pulse.
+    """
     signal = np.array(signal, dtype=np.float32)
     if len(signal) < fps * 3:
-        return None
+        return None, None, None, None
     signal = signal - signal.mean()
     low, high, nyq = 0.7, 4.0, fps / 2.0
     b, a = butter(3, [low / nyq, high / nyq], btype="band")
     filtered = filtfilt(b, a, signal)
+
     fft = np.abs(np.fft.rfft(filtered))
     freqs = np.fft.rfftfreq(len(filtered), d=1.0 / fps)
     valid = (freqs >= low) & (freqs <= high)
     if not valid.any():
-        return None
-    return round(freqs[valid][np.argmax(fft[valid])] * 60.0, 1)
+        return None, filtered, None, None
+
+    bpm = round(freqs[valid][np.argmax(fft[valid])] * 60.0, 1)
+    freqs_bpm = freqs[valid] * 60.0  # x-axis in beats per minute
+    spectrum = fft[valid]  # strength at each frequency
+    return bpm, filtered, freqs_bpm, spectrum
 
 
 @st.cache_data(show_spinner=False)
 def extract_signal_from_video(video_bytes, max_frames=300):
-    """Reads up to max_frames of red-channel brightness from the center of each frame.
+    """Read up to max_frames of red-channel brightness from the center of each frame.
 
     Returns (signal, fps). imageio gives RGB, so the red channel is index 0.
     Only a small center crop is averaged (where the fingertip covers the lens),
     which is faster and gives a cleaner pulse signal.
     """
-    # Detect fps from metadata, fall back to 30
     try:
         meta = iio.immeta(video_bytes, plugin="pyav")
         fps = float(meta.get("fps", 30.0))
@@ -84,24 +94,32 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 st.subheader("📤 Measure pulse from an uploaded video")
 st.caption(
     "Upload a video where a fingertip covers the camera lens. "
-    "The red-channel signal is extracted, plotted, and turned into a pulse."
+    "The red-channel signal is extracted, filtered, and the heart frequency plotted."
 )
 video = st.file_uploader("Upload a fingertip video", type=["mp4", "mov", "avi", "webm"])
 
 if video:
     with st.spinner("Analysing video..."):
-        # Pass raw bytes so @st.cache_data can hash the input
         signal, fps = extract_signal_from_video(video.getvalue())
 
     if len(signal) < 10:
         st.warning("The video seems too short to analyse.")
     else:
-        st.line_chart(signal)  # the PPG graph
+        bpm, filtered, freqs_bpm, spectrum = compute_bpm(signal, fps=fps)
         st.caption(f"Read {len(signal)} frames at ~{fps:.0f} fps")
-        bpm = compute_bpm(signal, fps=fps)
+
         if bpm:
             st.session_state.measured_bpm = bpm
             st.metric("Measured pulse", f"{bpm} bpm")
+
+            # 1) The heartbeat over time (slow drift removed)
+            st.caption("Filtered pulse signal (the heartbeat)")
+            st.line_chart(filtered)
+
+            # 2) The heart-frequency spectrum — the peak sits at the pulse
+            st.caption("Heart-rate frequency spectrum (peak = pulse)")
+            spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
+            st.line_chart(spectrum_df, x="bpm", y="strength")
         else:
             st.warning(
                 "Couldn't detect a clear pulse — hold the fingertip still on the "
@@ -137,8 +155,9 @@ else:
                 with lock:
                     data = list(signal_buffer)
                 if len(data) > 5:
-                    chart_ph.line_chart(data)
-                    bpm = compute_bpm(data)
+                    bpm, filtered, _, _ = compute_bpm(data)
+                    if filtered is not None:
+                        chart_ph.line_chart(filtered)
                     if bpm:
                         st.session_state.measured_bpm = bpm
                         bpm_ph.metric("Measured pulse", f"{bpm} bpm")
