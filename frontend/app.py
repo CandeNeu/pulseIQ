@@ -156,8 +156,11 @@ Model predictions (1 = at risk, 0 = not at risk):
         resp.raise_for_status()
         data = resp.json()
         return data["candidates"][0]["content"]["parts"][0]["text"]
-    except requests.exceptions.RequestException:
-        return "Could not reach Gemini. Check the model name and API key."
+    except requests.exceptions.RequestException as e:
+        # TEMPORARY DEBUG: show the real reason (status + body), never the key
+        status = getattr(e.response, "status_code", "no response")
+        body_text = getattr(e.response, "text", str(e))
+        return f"Could not reach Gemini (status {status}): {body_text}"
     except (KeyError, IndexError):
         return "Gemini returned an unexpected response."
 
