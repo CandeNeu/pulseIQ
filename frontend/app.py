@@ -123,7 +123,8 @@ def get_gemini_recommendation(patient, predictions):
     """Ask Gemini for a lifestyle recommendation based on the patient + predictions.
 
     Returns the recommendation text, or an error string. The API key is sent in a
-    header (never in the URL) so it can't leak into error messages.
+    header (never in the URL) so it can't leak into error messages. Retries a few
+    times on transient errors (503 overloaded / 429 rate limited).
     """
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
@@ -146,7 +147,6 @@ Patient data:
 Model predictions (1 = at risk, 0 = not at risk):
 - Diabetic: {predictions['diabetic']}
 - Hypertensive: {predictions['hypertensive']}
-- Cardiovascular: {predictions['cv']}
 """
 
     body = {
@@ -358,20 +358,19 @@ with tab3:
 
         st.success("Risk assessment complete!")
 
-        # The API returns: {"diabetic": 0/1, "hypertensive": 0/1, "cv": 0/1}
+        # The API returns {"diabetic": 0/1, "hypertensive": 0/1, "cv": 0/1};
+        # cardiovascular (cv) is intentionally not shown.
         predictions = {
             "diabetic": result.get("diabetic", 0),
             "hypertensive": result.get("hypertensive", 0),
-            "cv": result.get("cv", 0),
         }
 
         def label(v):
             return "⚠️ At risk" if str(v) in ("1", "yes", "Yes") else "✅ Not at risk"
 
-        res_col1, res_col2, res_col3 = st.columns(3)
+        res_col1, res_col2 = st.columns(2)
         res_col1.metric("Diabetes", label(predictions["diabetic"]))
         res_col2.metric("Hypertension", label(predictions["hypertensive"]))
-        res_col3.metric("Cardiovascular", label(predictions["cv"]))
 
         with st.expander("Raw API response"):
             st.write(result)
