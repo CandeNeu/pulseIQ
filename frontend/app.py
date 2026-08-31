@@ -54,49 +54,31 @@ def compute_bpm(signal, fps=30.0):
     return round(freqs[valid][np.argmax(fft[valid])] * 60.0, 1)
 
 
-def extract_signal_from_video(video_file):
-    """Reads a video and returns the mean red-channel brightness per frame (PPG signal)."""
-    video_file.seek(0)
-    # imageio gives RGB, so the red channel is index 0
-    return [float(f[:, :, 0].mean()) for f in iio.imiter(video_file, plugin="pyav")]
+@st.cache_data(show_spinner=False)
+def extract_signal_from_video(video_bytes, max_frames=300):
+    """Reads up to max_frames of red-channel brightness from the center of each frame.
 
+    Returns (signal, fps). imageio gives RGB, so the red channel is index 0.
+    Only a small center crop is averaged (where the fingertip covers the lens),
+    which is faster and gives a cleaner pulse signal.
+    """
+    # Detect fps from metadata, fall back to 30
+    try:
+        meta = iio.immeta(video_bytes, plugin="pyav")
+        fps = float(meta.get("fps", 30.0))
+    except Exception:
+        fps = 30.0
 
-# ============ Live pulse measurement from camera ============
-with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
-    st.caption(
-        "Cover the camera lens with your fingertip and hold still. "
-        "The measured pulse will fill in the Pulse rate field below."
-    )
-    col_cam, col_graph = st.columns(2)
-    with col_cam:
-        ctx = webrtc_streamer(
-            key="pulse",
-            mode=WebRtcMode.SENDRECV,
-            video_frame_callback=video_frame_callback,
-            rtc_configuration={
-                "iceServers": [
-                    {"urls": ["stun:stun.l.google.com:19302"]},
-                ]
-            },
-            media_stream_constraints={"video": True, "audio": False},
-            async_processing=True,
-        )
-    with col_graph:
-        chart_ph = st.empty()
-        bpm_ph = st.empty()
+    signal = []
+    for frame in iio.imiter(video_bytes, plugin="pyav"):
+        h, w, _ = frame.shape
+        cy, cx = h // 2, w // 2
+        crop = frame[cy - 50 : cy + 50, cx - 50 : cx + 50, 0]  # center, red channel
+        signal.append(float(crop.mean()))
+        if len(signal) >= max_frames:
+            break
+    return signal, fps
 
-    if ctx.state.playing:
-        while ctx.state.playing:
-            with lock:
-                data = list(signal_buffer)
-            if len(data) > 5:
-                chart_ph.line_chart(data)
-                bpm = compute_bpm(data)
-                if bpm:
-                    st.session_state.measured_bpm = bpm
-                    bpm_ph.metric("Measured pulse", f"{bpm} bpm")
-            time.sleep(0.3)
-# ============ End of camera block ============
 
 # ============ Measure pulse from an uploaded video ============
 st.subheader("📤 Measure pulse from an uploaded video")
@@ -108,22 +90,60 @@ video = st.file_uploader("Upload a fingertip video", type=["mp4", "mov", "avi", 
 
 if video:
     with st.spinner("Analysing video..."):
-        signal = extract_signal_from_video(video)
+        # Pass raw bytes so @st.cache_data can hash the input
+        signal, fps = extract_signal_from_video(video.getvalue())
 
     if len(signal) < 10:
         st.warning("The video seems too short to analyse.")
     else:
         st.line_chart(signal)  # the PPG graph
-        bpm = compute_bpm(signal, fps=30.0)
+        st.caption(f"Read {len(signal)} frames at ~{fps:.0f} fps")
+        bpm = compute_bpm(signal, fps=fps)
         if bpm:
             st.session_state.measured_bpm = bpm
             st.metric("Measured pulse", f"{bpm} bpm")
         else:
             st.warning(
-                "Couldn't detect a clear pulse — the video may be too short "
-                "(needs ~3+ seconds) or too unstable."
+                "Couldn't detect a clear pulse — hold the fingertip still on the "
+                "lens for a few seconds, or the lighting may have shifted too much."
             )
-# ============ End of uploaded video block ============
+else:
+    # ============ Live camera – only shown when NO video is uploaded ============
+    with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
+        st.caption(
+            "Cover the camera lens with your fingertip and hold still. "
+            "The measured pulse will fill in the Pulse rate field below."
+        )
+        col_cam, col_graph = st.columns(2)
+        with col_cam:
+            ctx = webrtc_streamer(
+                key="pulse",
+                mode=WebRtcMode.SENDRECV,
+                video_frame_callback=video_frame_callback,
+                rtc_configuration={
+                    "iceServers": [
+                        {"urls": ["stun:stun.l.google.com:19302"]},
+                    ]
+                },
+                media_stream_constraints={"video": True, "audio": False},
+                async_processing=True,
+            )
+        with col_graph:
+            chart_ph = st.empty()
+            bpm_ph = st.empty()
+
+        if ctx.state.playing:
+            while ctx.state.playing:
+                with lock:
+                    data = list(signal_buffer)
+                if len(data) > 5:
+                    chart_ph.line_chart(data)
+                    bpm = compute_bpm(data)
+                    if bpm:
+                        st.session_state.measured_bpm = bpm
+                        bpm_ph.metric("Measured pulse", f"{bpm} bpm")
+                time.sleep(0.3)
+# ============ End of pulse measurement ============
 
 col1, col2 = st.columns(2)
 with col1:
