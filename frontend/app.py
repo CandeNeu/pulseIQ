@@ -19,7 +19,11 @@ API_URL = os.environ.get(
 )
 
 st.title("🩺 PulseIQ – Diabetes Risk Prediction")
-st.markdown("Enter the patient's details to get a prediction from the model.")
+st.markdown(
+    "**Step 1** – enter the patient's details. "
+    "**Step 2** – measure the pulse from a video. "
+    "**Step 3** – get the prediction."
+)
 
 # ============ Session state ============
 if "signal_buffer" not in st.session_state:
@@ -41,9 +45,7 @@ def video_frame_callback(frame):
 def compute_bpm(signal, fps=30.0):
     """Estimate heart rate from a brightness signal via bandpass + FFT.
 
-    Returns (bpm, filtered_signal, freqs_bpm, spectrum). The filtered signal is
-    the raw brightness with slow drift removed (the actual heartbeat ripple).
-    freqs_bpm/spectrum describe the frequency content, with the peak = pulse.
+    Returns (bpm, filtered_signal, freqs_bpm, spectrum).
     """
     signal = np.array(signal, dtype=np.float32)
     if len(signal) < fps * 3:
@@ -60,8 +62,8 @@ def compute_bpm(signal, fps=30.0):
         return None, filtered, None, None
 
     bpm = round(freqs[valid][np.argmax(fft[valid])] * 60.0, 1)
-    freqs_bpm = freqs[valid] * 60.0  # x-axis in beats per minute
-    spectrum = fft[valid]  # strength at each frequency
+    freqs_bpm = freqs[valid] * 60.0
+    spectrum = fft[valid]
     return bpm, filtered, freqs_bpm, spectrum
 
 
@@ -70,8 +72,6 @@ def extract_signal_from_video(video_bytes, max_frames=300):
     """Read up to max_frames of red-channel brightness from the center of each frame.
 
     Returns (signal, fps). imageio gives RGB, so the red channel is index 0.
-    Only a small center crop is averaged (where the fingertip covers the lens),
-    which is faster and gives a cleaner pulse signal.
     """
     try:
         meta = iio.immeta(video_bytes, plugin="pyav")
@@ -90,51 +90,94 @@ def extract_signal_from_video(video_bytes, max_frames=300):
     return signal, fps
 
 
-# ============ Measure pulse from an uploaded video ============
-st.subheader("📤 Measure pulse from an uploaded video")
-st.caption(
-    "Upload a video where a fingertip covers the camera lens. "
-    "The red-channel signal is extracted, filtered, and the heart frequency plotted."
+# =====================================================================
+# STEP 1 — Patient details (must be filled before video is unlocked)
+# =====================================================================
+st.header("1️⃣ Patient details")
+
+col1, col2 = st.columns(2)
+with col1:
+    age = st.number_input("Age", min_value=0, max_value=120, value=42)
+    gender = st.selectbox("Gender", ["Female", "Male"])
+    systolic_bp = st.number_input("Systolic BP", min_value=70, max_value=250, value=110)
+    diastolic_bp = st.number_input(
+        "Diastolic BP", min_value=40, max_value=150, value=73
+    )
+    glucose = st.number_input("Glucose", min_value=2.0, max_value=30.0, value=5.88)
+    height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=1.65)
+with col2:
+    weight = st.number_input("Weight (kg)", min_value=20.0, max_value=250.0, value=70.2)
+    family_diabetes = st.selectbox("Family history of diabetes", ["No", "Yes"])
+    hypertensive = st.selectbox("Hypertensive", ["No", "Yes"])
+    family_hypertension = st.selectbox("Family history of hypertension", ["No", "Yes"])
+    cardiovascular_disease = st.selectbox("Cardiovascular disease", ["No", "Yes"])
+    stroke = st.selectbox("Stroke", ["No", "Yes"])
+
+# BMI is calculated automatically from height and weight
+bmi = round(weight / (height**2), 2) if height > 0 else 0.0
+st.metric("BMI (auto-calculated)", bmi)
+
+# Gate: the video stays locked until this is ticked
+details_done = st.checkbox(
+    "✅ I have entered all the patient's details above", value=False
 )
-video = st.file_uploader("Upload a fingertip video", type=["mp4", "mov", "avi", "webm"])
 
-if video:
-    with st.spinner("Analysing video..."):
-        signal, fps = extract_signal_from_video(video.getvalue())
+# =====================================================================
+# STEP 2 — Measure pulse from a video (locked until step 1 is confirmed)
+# =====================================================================
+st.header("2️⃣ Measure pulse")
 
-    if len(signal) < 10:
-        st.warning("The video seems too short to analyse.")
-    else:
-        bpm, filtered, freqs_bpm, spectrum = compute_bpm(signal, fps=fps)
-        st.caption(f"Read {len(signal)} frames at ~{fps:.0f} fps")
-
-        if bpm:
-            st.session_state.measured_bpm = bpm
-            st.session_state.pulse_rate_input = int(
-                bpm
-            )  # ← push into the Pulse rate field
-            st.metric("Measured pulse", f"{bpm} bpm")
-
-            # 1) The heartbeat over time (slow drift removed)
-            st.caption("Filtered pulse signal (the heartbeat)")
-            st.line_chart(filtered)
-
-            # 2) The heart-frequency spectrum — the peak sits at the pulse
-            st.caption("Heart-rate frequency spectrum (peak = pulse)")
-            spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
-            st.line_chart(spectrum_df, x="bpm", y="strength")
-        else:
-            st.warning(
-                "Couldn't detect a clear pulse — hold the fingertip still on the "
-                "lens for a few seconds, or the lighting may have shifted too much."
-            )
+if not details_done:
+    st.info(
+        "Fill in the patient's details above, then tick the box to unlock "
+        "pulse measurement."
+    )
 else:
-    # ============ Live camera – only shown when NO video is uploaded ============
-    with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
-        st.caption(
-            "Cover the camera lens with your fingertip and hold still. "
-            "The measured pulse will fill in the Pulse rate field below."
-        )
+    st.caption(
+        "Upload a video where a fingertip covers the camera lens. "
+        "The red-channel signal is extracted, filtered, and the heart frequency plotted."
+    )
+    video = st.file_uploader(
+        "Upload a fingertip video", type=["mp4", "mov", "avi", "webm"]
+    )
+
+    if video:
+        with st.spinner("Analysing video..."):
+            signal, fps = extract_signal_from_video(video.getvalue())
+
+        if len(signal) < 10:
+            st.warning("The video seems too short to analyse.")
+        else:
+            bpm, filtered, freqs_bpm, spectrum = compute_bpm(signal, fps=fps)
+            st.caption(f"Read {len(signal)} frames at ~{fps:.0f} fps")
+
+            if bpm:
+                st.session_state.measured_bpm = bpm
+                st.metric("Measured pulse", f"{bpm} bpm")
+
+                st.markdown("#### ❤️ Filtered pulse signal (the heartbeat)")
+                st.markdown(
+                    "Fingertip brightness over time, with slow lighting drift removed. "
+                    "Each **peak is one heartbeat** — evenly spaced peaks mean a clean read."
+                )
+                st.line_chart(filtered)
+
+                st.markdown("#### 📊 Heart-rate frequency spectrum")
+                st.markdown(
+                    "How strong each possible heart rate is in the signal. The tall peak "
+                    f"marks the pulse (**{bpm:.0f} bpm**); smaller bumps are noise/harmonics."
+                )
+                spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
+                st.line_chart(spectrum_df, x="bpm", y="strength")
+            else:
+                st.warning(
+                    "Couldn't detect a clear pulse — hold the fingertip still on the "
+                    "lens for a few seconds, or the lighting may have shifted too much."
+                )
+
+    # Optional: live camera as an alternative to uploading
+    with st.expander("📹 Or measure from the live camera instead"):
+        st.caption("Cover the lens with your fingertip and hold still.")
         col_cam, col_graph = st.columns(2)
         with col_cam:
             ctx = webrtc_streamer(
@@ -142,9 +185,7 @@ else:
                 mode=WebRtcMode.SENDRECV,
                 video_frame_callback=video_frame_callback,
                 rtc_configuration={
-                    "iceServers": [
-                        {"urls": ["stun:stun.l.google.com:19302"]},
-                    ]
+                    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
                 },
                 media_stream_constraints={"video": True, "audio": False},
                 async_processing=True,
@@ -165,83 +206,69 @@ else:
                         st.session_state.measured_bpm = bpm
                         bpm_ph.metric("Measured pulse", f"{bpm} bpm")
                 time.sleep(0.3)
-# ============ End of pulse measurement ============
 
-col1, col2 = st.columns(2)
-with col1:
-    age = st.number_input("Age", min_value=0, max_value=120, value=42)
-    gender = st.selectbox("Gender", ["Female", "Male"])
-    # Pulse rate is bound to a session key so the video result can fill it in
-    if "pulse_rate_input" not in st.session_state:
-        st.session_state.pulse_rate_input = 66
-    pulse_rate = st.number_input(
-        "Pulse rate", min_value=30, max_value=200, key="pulse_rate_input"
-    )
-    systolic_bp = st.number_input("Systolic BP", min_value=70, max_value=250, value=110)
-    diastolic_bp = st.number_input(
-        "Diastolic BP", min_value=40, max_value=150, value=73
-    )
-    glucose = st.number_input("Glucose", min_value=2.0, max_value=30.0, value=5.88)
-    height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=1.65)
-with col2:
-    weight = st.number_input("Weight (kg)", min_value=20.0, max_value=250.0, value=70.2)
-    family_diabetes = st.selectbox("Family history of diabetes", ["No", "Yes"])
-    hypertensive = st.selectbox("Hypertensive", ["No", "Yes"])
-    family_hypertension = st.selectbox("Family history of hypertension", ["No", "Yes"])
-    cardiovascular_disease = st.selectbox("Cardiovascular disease", ["No", "Yes"])
-    stroke = st.selectbox("Stroke", ["No", "Yes"])
+# =====================================================================
+# STEP 3 — Predict (needs both the details and a measured pulse)
+# =====================================================================
+st.header("3️⃣ Predict")
 
-# BMI is calculated automatically from height and weight
-bmi = round(weight / (height**2), 2) if height > 0 else 0.0
-st.metric("BMI (auto-calculated)", bmi)
+pulse_rate = (
+    int(st.session_state.measured_bpm) if st.session_state.measured_bpm else None
+)
 
-params = {
-    "age": age,
-    "gender": gender,
-    "pulse_rate": pulse_rate,
-    "systolic_bp": systolic_bp,
-    "diastolic_bp": diastolic_bp,
-    "glucose": glucose,
-    "height": height,
-    "weight": weight,
-    "bmi": bmi,
-    "family_diabetes": 1 if family_diabetes == "Yes" else 0,
-    "hypertensive": 1 if hypertensive == "Yes" else 0,
-    "family_hypertension": 1 if family_hypertension == "Yes" else 0,
-    "cardiovascular_disease": 1 if cardiovascular_disease == "Yes" else 0,
-    "stroke": 1 if stroke == "Yes" else 0,
-}
+if not details_done:
+    st.info("Complete step 1 first.")
+elif not pulse_rate:
+    st.info("Measure the pulse in step 2 first.")
+else:
+    st.write(f"Using measured pulse: **{pulse_rate} bpm**")
 
-if st.button("Predict risk", type="primary"):
-    try:
-        response = requests.get(API_URL, params=params)
-
-        # Show what the server actually returned (helps diagnose non-JSON errors)
-        if response.status_code != 200:
-            st.error(f"API returned status {response.status_code}")
-            st.code(response.text)
-            st.stop()
+    if st.button("Predict risk", type="primary"):
+        params = {
+            "age": age,
+            "gender": gender,
+            "pulse_rate": pulse_rate,
+            "systolic_bp": systolic_bp,
+            "diastolic_bp": diastolic_bp,
+            "glucose": glucose,
+            "height": height,
+            "weight": weight,
+            "bmi": bmi,
+            "family_diabetes": 1 if family_diabetes == "Yes" else 0,
+            "hypertensive": 1 if hypertensive == "Yes" else 0,
+            "family_hypertension": 1 if family_hypertension == "Yes" else 0,
+            "cardiovascular_disease": 1 if cardiovascular_disease == "Yes" else 0,
+            "stroke": 1 if stroke == "Yes" else 0,
+        }
 
         try:
-            result = response.json()
-        except requests.exceptions.JSONDecodeError:
-            st.error("The API did not return valid JSON. Raw response below:")
-            st.code(response.text)
-            st.stop()
+            response = requests.get(API_URL, params=params)
 
-        pred = result.get("diabetic_prediction")
-        if pred is not None:
-            if str(pred).lower() in ("yes", "1"):
-                st.error("Prediction: Diabetic")
-            else:
-                st.success("Prediction: Not diabetic")
+            if response.status_code != 200:
+                st.error(f"API returned status {response.status_code}")
+                st.code(response.text)
+                st.stop()
 
-        risk = result.get("diabetic_risk")
-        if risk is not None:
-            st.metric("Estimated risk", f"{risk:.1%}")
+            try:
+                result = response.json()
+            except requests.exceptions.JSONDecodeError:
+                st.error("The API did not return valid JSON. Raw response below:")
+                st.code(response.text)
+                st.stop()
 
-        with st.expander("Raw API response"):
-            st.write(result)
+            pred = result.get("diabetic_prediction")
+            if pred is not None:
+                if str(pred).lower() in ("yes", "1"):
+                    st.error("Prediction: Diabetic")
+                else:
+                    st.success("Prediction: Not diabetic")
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"Could not reach the API: {e}")
+            risk = result.get("diabetic_risk")
+            if risk is not None:
+                st.metric("Estimated risk", f"{risk:.1%}")
+
+            with st.expander("Raw API response"):
+                st.write(result)
+
+        except requests.exceptions.RequestException as e:
+            st.error(f"Could not reach the API: {e}")
