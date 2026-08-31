@@ -1,38 +1,40 @@
-from xgboost import XGBClassifier
-
 import json
-from pulseiq.params import *
-
 import os
+import pickle
 
 MODELS_DIR = "models"
 os.makedirs(MODELS_DIR, exist_ok=True)
 
 
-def save_model(model, name):
-    model_path = os.path.join(MODELS_DIR,f"XGBoost_{name}.json")
-    config_path = os.path.join(MODELS_DIR, f"config_{name}.json")
+def save_model(model, params: dict, model_name: str, target: str) -> None:
+    """Guarda el modelo (.pkl) y sus hiperparámetros/métricas (.json)."""
+    model_path = os.path.join(MODELS_DIR, f"{model_name}_{target}.pkl")
+    params_path = os.path.join(MODELS_DIR, f"params_{model_name}_{target}.json")
 
-    # 1. Save the trained binary/booster model
-    model.save_model(str(model_path))
+    with open(model_path, "wb") as f:
+        pickle.dump(model, f)
 
-    # 2. Save the initialization hyperparameters dictionary
-    params = model.get_params()
-    with open(config_path, "w") as f:
-        json.dump(params, f, indent=4)
+    with open(params_path, "w", encoding="utf-8") as f:
+        json.dump(params, f, indent=4, default=str)
 
-
-def load_model(name):
-    model_path = os.path.join(MODELS_DIR, f"XGBoost_{name}.json")
-    config_path = os.path.join(MODELS_DIR, f"config_{name}.json")
+    print(f"✅ Artefactos guardados: [{model_name}_{target}] en {MODELS_DIR}/")
 
 
-    # 1. Load the hyperparameters to set up the wrapper
-    with open(config_path, "r") as f:
-        params = json.load(f)
+def load_model(model_name: str, target: str):
+    """Carga el modelo entrenado (.pkl)."""
+    model_path = os.path.join(MODELS_DIR, f"{model_name}_{target}.pkl")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"No model found at path: {model_path}")
 
-    # 2. Instantiate with parameters and load trained weights
-    model = XGBClassifier(**params)
-    model.load_model(str(model_path))
+    with open(model_path, "rb") as f:
+        return pickle.load(f)
 
-    return model
+
+def load_params(model_name: str, target: str) -> dict:
+    """Carga los parámetros y métricas guardadas (.json)."""
+    params_path = os.path.join(MODELS_DIR, f"params_{model_name}_{target}.json")
+    if not os.path.exists(params_path):
+        raise FileNotFoundError(f"No params found at path: {params_path}")
+
+    with open(params_path, "r", encoding="utf-8") as f:
+        return json.load(f)
