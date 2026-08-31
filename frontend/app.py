@@ -149,23 +149,25 @@ Model predictions (1 = at risk, 0 = not at risk):
 - Cardiovascular: {predictions['cv']}
 """
 
-    body = {
+        body = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": 500},
     }
 
-    try:
-        resp = requests.post(url, headers=headers, json=body, timeout=90)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"]
-    except requests.exceptions.RequestException as e:
-        # TEMPORARY DEBUG: show the real reason (status + body), never the key
-        status = getattr(e.response, "status_code", "no response")
-        body_text = getattr(e.response, "text", str(e))
-        return f"Could not reach Gemini (status {status}): {body_text}"
-    except (KeyError, IndexError):
-        return "Gemini returned an unexpected response."
+    for attempt in range(3):  # retry up to 3 times on transient errors
+        try:
+            resp = requests.post(url, headers=headers, json=body, timeout=90)
+            resp.raise_for_status()
+            data = resp.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except requests.exceptions.RequestException as e:
+            status = getattr(e.response, "status_code", None)
+            if status in (503, 429) and attempt < 2:
+                time.sleep(2)      # wait and retry on overload / rate limit
+                continue
+            return "The recommendation service is busy right now. Please try again in a moment."
+        except (KeyError, IndexError):
+            return "Gemini returned an unexpected response."
 
 
 # ============ Tabs ============
