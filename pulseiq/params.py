@@ -20,3 +20,9 @@ CONFIG_CV = 'config_cv.json'
 MODEL_DIABETES = 'XGBoost_diabetic.json'
 MODEL_HYPERTENSION = 'XGBoost_hypertensive.json'
 MODEL_CV = 'XGBoost_cv.json'
+
+PROJECT_ID = 'pulseiq-506808'
+BUCKET_NAME = 'pulseiq'
+
+DIABETES_SYNTAXIS = 'diabetic'
+HYPERTENSIVE_SYNTAXIS = 'hypertension'

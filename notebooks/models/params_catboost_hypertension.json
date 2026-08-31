@@ -1,0 +1,14 @@
+{
+    "model": "catboost",
+    "target": "hypertension",
+    "best_roc_auc": 0.80838,
+    "params": {
+        "iterations": 400,
+        "depth": 4,
+        "learning_rate": 0.02662031281197009,
+        "l2_leaf_reg": 1.7429308849389193,
+        "random_seed": 42,
+        "verbose": 0,
+        "thread_count": -1
+    }
+}

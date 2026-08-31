@@ -1,6 +1,8 @@
 import json
 import os
 import pickle
+from google.cloud import storage
+from pulseiq.params import *
 
 MODELS_DIR = "models"
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -38,3 +40,19 @@ def load_params(model_name: str, target: str) -> dict:
 
     with open(params_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_model_from_bucket(target):
+    client = storage.Client()
+    blobs = list(client.get_bucket(BUCKET_NAME).list_blobs())
+    breakpoint()
+    target_blob = [blob for blob in blobs if target in blob.name]
+    blob = target_blob[0]
+    model_path = os.path.join(MODELS_DIR, f"XGBoost_{target}.pkl")
+    blob.download_to_filename(model_path)
+
+
+if __name__ == "__main__":
+
+    load_model_from_bucket(DIABETES_SYNTAXIS)
+    load_model_from_bucket(HYPERTENSIVE_SYNTAXIS)

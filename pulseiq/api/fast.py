@@ -12,7 +12,6 @@ app = FastAPI()
 
 app.state.diabetic = load_model("diabetic")
 app.state.hypertensive = load_model("hypertensive")
-app.state.cv = load_model("cv")
 
 
 app.add_middleware(

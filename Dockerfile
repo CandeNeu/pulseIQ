@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 
-
 COPY setup.py .
 COPY pulseiq/ pulseiq
 COPY models/ models

@@ -1,0 +1,12 @@
+{
+    "classifier": "XGBClassifier",
+    "n_estimators": 600,
+    "max_depth": 3,
+    "learning_rate": 0.04125698250535174,
+    "min_child_weight": 1,
+    "subsample": 0.6941220843455611,
+    "colsample_bytree": 0.5201612537924206,
+    "gamma": 0.4536370405824596,
+    "reg_alpha": 9.61620981358295,
+    "reg_lambda": 0.04431777058808267
+}
