@@ -7,6 +7,7 @@ DATABASE_URL = 'https://data.mendeley.com/public-files/datasets/m8cgwxs9s6/files
 DATABASE_PATH = os.path.join(HOME_PATH,"code/CandeNeu/pulseIQ/raw_data/DEMO_J.xpt")
 DATABASE_PATH = "/home/candelaneumann/code/CandeNeu/pulseIQ/raw_data/DEMO_J.xpt"
 
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = BASE_DIR / "frontend"
 FRONTEND_DIR.mkdir(parents=True, exist_ok=True)
