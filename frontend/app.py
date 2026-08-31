@@ -149,14 +149,23 @@ if st.button("Predict risk", type="primary"):
     try:
         response = requests.get(API_URL, params=params)
         response.raise_for_status()
-        result = response.json()
+
+        # Försök tolka svaret som JSON
+        try:
+            result = response.json()
+        except requests.exceptions.JSONDecodeError:
+            st.error(
+                "API:et returnerade inte giltig JSON. Detta beror ofta på ett serverfel."
+            )
+            st.expander("Se rått API-svar (för felsökning)").code(response.text)
+            st.stop()
 
         pred = result.get("diabetic_prediction")
         if pred is not None:
             if str(pred).lower() in ("yes", "1"):
-                st.error(f"Prediction: Diabetic")
+                st.error("Prediction: Diabetic")
             else:
-                st.success(f"Prediction: Not diabetic")
+                st.success("Prediction: Not diabetic")
 
         risk = result.get("diabetic_risk")
         if risk is not None:
@@ -166,5 +175,7 @@ if st.button("Predict risk", type="primary"):
             st.write(result)
 
     except requests.exceptions.RequestException as e:
-        st.error(f"Could not reach the API: {e}")
-        st.info(f"Checking URL: {API_URL}")
+        st.error(f"Kunde inte nå API:et eller fick en felkod: {e}")
+        # Om felet uppstod efter att vi fick ett svar (t.ex. 500-fel), visa svaret
+        if "response" in locals() and response is not None:
+            st.expander("Se serverns felsida").code(response.text)
