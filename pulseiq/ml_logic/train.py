@@ -1,10 +1,13 @@
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 import json
 from pathlib import Path
-from sklearn.model_selection import StratifiedKFold
 import numpy as np
 from pulseiq.params import *
+from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from sklearn.ensemble import RandomForestClassifier
 
 
 def train_model(model_class, X, y, params):

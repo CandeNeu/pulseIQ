@@ -17,6 +17,7 @@ openpyxl
 optuna
 xgboost
 opencv-python
+catboost
 
 fastapi
 uvicorn
