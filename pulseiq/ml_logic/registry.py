@@ -45,7 +45,6 @@ def load_params(model_name: str, target: str) -> dict:
 def load_model_from_bucket(target):
     client = storage.Client()
     blobs = list(client.get_bucket(BUCKET_NAME).list_blobs())
-    breakpoint()
     target_blob = [blob for blob in blobs if target in blob.name]
     blob = target_blob[0]
     model_path = os.path.join(MODELS_DIR, f"XGBoost_{target}.pkl")
