@@ -89,6 +89,16 @@ with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
             time.sleep(0.3)
 # ============ End of camera block ============
 
+# ==============Video File Uploader=================
+
+video = st.file_uploader("Upload a video", type=["mp4", "mov", "avi", "webm"])
+
+if video and st.button("Predict"):
+    response = requests.post(API_URL, files={"file": video})
+    st.write(response.json())
+
+# ==============End of Video File Uploader==========
+
 col1, col2 = st.columns(2)
 with col1:
     age = st.number_input("Age", min_value=0, max_value=120, value=42)
