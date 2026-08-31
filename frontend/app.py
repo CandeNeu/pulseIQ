@@ -4,6 +4,7 @@ import threading
 import requests
 import numpy as np
 import streamlit as st
+import imageio.v3 as iio
 from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
@@ -19,7 +20,7 @@ API_URL = os.environ.get(
 st.title("🩺 PulseIQ – Diabetes Risk Prediction")
 st.markdown("Enter the patient's details to get a prediction from the model.")
 
-# ============ Live pulse measurement from camera ============
+# ============ Session state ============
 if "signal_buffer" not in st.session_state:
     st.session_state.signal_buffer = deque(maxlen=300)  # ~10s @ 30fps
 if "measured_bpm" not in st.session_state:
@@ -53,6 +54,14 @@ def compute_bpm(signal, fps=30.0):
     return round(freqs[valid][np.argmax(fft[valid])] * 60.0, 1)
 
 
+def extract_signal_from_video(video_file):
+    """Reads a video and returns the mean red-channel brightness per frame (PPG signal)."""
+    video_file.seek(0)
+    # imageio gives RGB, so the red channel is index 0
+    return [float(f[:, :, 0].mean()) for f in iio.imiter(video_file, plugin="pyav")]
+
+
+# ============ Live pulse measurement from camera ============
 with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
     st.caption(
         "Cover the camera lens with your fingertip and hold still. "
@@ -89,15 +98,32 @@ with st.expander("📹 Measure pulse from camera (optional)", expanded=False):
             time.sleep(0.3)
 # ============ End of camera block ============
 
-# ==============Video File Uploader=================
+# ============ Measure pulse from an uploaded video ============
+st.subheader("📤 Measure pulse from an uploaded video")
+st.caption(
+    "Upload a video where a fingertip covers the camera lens. "
+    "The red-channel signal is extracted, plotted, and turned into a pulse."
+)
+video = st.file_uploader("Upload a fingertip video", type=["mp4", "mov", "avi", "webm"])
 
-video = st.file_uploader("Upload a video", type=["mp4", "mov", "avi", "webm"])
+if video:
+    with st.spinner("Analysing video..."):
+        signal = extract_signal_from_video(video)
 
-if video and st.button("Predict"):
-    response = requests.post(API_URL, files={"file": video})
-    st.write(response.json())
-
-# ==============End of Video File Uploader==========
+    if len(signal) < 10:
+        st.warning("The video seems too short to analyse.")
+    else:
+        st.line_chart(signal)  # the PPG graph
+        bpm = compute_bpm(signal, fps=30.0)
+        if bpm:
+            st.session_state.measured_bpm = bpm
+            st.metric("Measured pulse", f"{bpm} bpm")
+        else:
+            st.warning(
+                "Couldn't detect a clear pulse — the video may be too short "
+                "(needs ~3+ seconds) or too unstable."
+            )
+# ============ End of uploaded video block ============
 
 col1, col2 = st.columns(2)
 with col1:
@@ -148,16 +174,18 @@ params = {
 if st.button("Predict risk", type="primary"):
     try:
         response = requests.get(API_URL, params=params)
-        response.raise_for_status()
 
-        # Försök tolka svaret som JSON
+        # Show what the server actually returned (helps diagnose non-JSON errors)
+        if response.status_code != 200:
+            st.error(f"API returned status {response.status_code}")
+            st.code(response.text)
+            st.stop()
+
         try:
             result = response.json()
         except requests.exceptions.JSONDecodeError:
-            st.error(
-                "API:et returnerade inte giltig JSON. Detta beror ofta på ett serverfel."
-            )
-            st.expander("Se rått API-svar (för felsökning)").code(response.text)
+            st.error("The API did not return valid JSON. Raw response below:")
+            st.code(response.text)
             st.stop()
 
         pred = result.get("diabetic_prediction")
@@ -175,7 +203,4 @@ if st.button("Predict risk", type="primary"):
             st.write(result)
 
     except requests.exceptions.RequestException as e:
-        st.error(f"Kunde inte nå API:et eller fick en felkod: {e}")
-        # Om felet uppstod efter att vi fick ett svar (t.ex. 500-fel), visa svaret
-        if "response" in locals() and response is not None:
-            st.expander("Se serverns felsida").code(response.text)
+        st.error(f"Could not reach the API: {e}")
