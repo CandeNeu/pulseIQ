@@ -629,34 +629,35 @@ elif st.session_state.step == 3:
 
     rec = st.session_state.recommendation
 
-    if "error" in rec:
-        st.error(rec["error"])
-    else:
-        col_diet, col_exercise, col_monitor = st.columns(3)
+    if rec is not None:
+        if "error" in rec:
+            st.error(rec["error"])
+        else:
+            col_diet, col_exercise, col_monitor = st.columns(3)
 
-        with col_diet:
-            st.markdown("#### 🥗 Diet")
-            for tip in rec.get("diet", []):
-                st.markdown(f"- {tip}")
+            with col_diet:
+                st.markdown("#### 🥗 Diet")
+                for tip in rec.get("diet", []):
+                    st.markdown(f"- {tip}")
 
-        with col_exercise:
-            st.markdown("#### 🏃 Exercise")
-            for tip in rec.get("exercise", []):
-                st.markdown(f"- {tip}")
+            with col_exercise:
+                st.markdown("#### 🏃 Exercise")
+                for tip in rec.get("exercise", []):
+                    st.markdown(f"- {tip}")
 
-        with col_monitor:
-            st.markdown("#### 📈 Monitoring")
-            for tip in rec.get("monitoring", []):
-                st.markdown(f"- {tip}")
+            with col_monitor:
+                st.markdown("#### 📈 Monitoring")
+                for tip in rec.get("monitoring", []):
+                    st.markdown(f"- {tip}")
 
-        links = rec.get("further_reading", [])
-        if links:
-            st.markdown("---")
-            st.markdown("#### 📚 Further reading")
-            st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
+            links = rec.get("further_reading", [])
+            if links:
+                st.markdown("---")
+                st.markdown("#### 📚 Further reading")
+                st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
 
-        if rec.get("disclaimer"):
-            st.caption(f"_{rec['disclaimer']}_")
+            if rec.get("disclaimer"):
+                st.caption(f"_{rec['disclaimer']}_")
 
     # Navigation
     st.markdown("<br>", unsafe_allow_html=True)
