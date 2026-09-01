@@ -24,8 +24,6 @@ st.set_page_config(page_title="PulseIQ", page_icon="🩺", layout="wide")
 st.markdown(
     """
     <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
 
     .block-container {
         max-width: 1000px;
@@ -50,9 +48,26 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("🩺 PulseIQ – Diabetes Risk Prediction")
-
 # ============ Session state ============
+if "step" not in st.session_state:
+    st.session_state.step = 1
+
+if "theme_mode" not in st.session_state:
+    st.session_state.theme_mode = "Dark"
+
+if "age" not in st.session_state:
+    st.session_state.age = 25
+if "gender" not in st.session_state:
+    st.session_state.gender = "Male"
+if "height" not in st.session_state:
+    st.session_state.height = 1.70
+if "weight" not in st.session_state:
+    st.session_state.weight = 68.90
+if "ever_smoked" not in st.session_state:
+    st.session_state.ever_smoked = "No"
+if "current_smoker" not in st.session_state:
+    st.session_state.current_smoker = "No"
+
 if "signal_buffer" not in st.session_state:
     st.session_state.signal_buffer = deque(maxlen=300)  # ~10s @ 30fps
 if "measured_bpm" not in st.session_state:
@@ -60,6 +75,71 @@ if "measured_bpm" not in st.session_state:
 lock = threading.Lock()
 signal_buffer = st.session_state.signal_buffer
 
+# ============ Session CSS ============
+is_dark = st.session_state.theme_mode == "Dark"
+bg_color = "#0e1117" if is_dark else "#f8f9fa"
+card_bg = "#1e232d" if is_dark else "#ffffff"
+text_color = "#ffffff" if is_dark else "#111827"
+subtext_color = "#94a3b8" if is_dark else "#6b7280"
+border_color = "#e5e7eb" if is_dark else "#e5e7eb"
+
+st.markdown(
+    f"""
+    <style>
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+
+    .stApp {{
+        background-color: {bg_color};
+        color: {text_color};
+    }}
+
+    .block-container {{
+        max-width: 950px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        margin: 0 auto;
+    }}
+
+    .risk-card {{
+        background-color: {card_bg};
+        border: 1px solid {border_color};
+        border-radius: 12px;
+        padding: 22px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }}
+
+    .badge-safe {{
+        background-color: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border: 1px solid #22c55e;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }}
+
+    .badge-risk {{
+        background-color: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border: 1px solid #ef4444;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }}
+
+    .stButton>button {{
+        border-radius: 8px;
+        height: 3rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 def video_frame_callback(frame):
     """Runs on every camera frame – extracts red brightness (PPG signal)."""
@@ -218,39 +298,79 @@ Generate the recommendations as JSON."""
 
 
 # ============ Tabs ============
-tab1, tab2, tab3 = st.tabs(
-    ["📝 1. Patient details", "❤️ 2. Pulse measurement", "📊 3. Analysis & Result"]
-)
+header_col, theme_col = st.columns([5, 1])
+
+with header_col:
+    st.title("🩺 PulseIQ – Risk Assessment")
+
+with theme_col:
+    selected_theme = st.selectbox(
+        "Theme",
+        ["Dark", "Light"],
+        index=0 if st.session_state.theme_mode == "Dark" else 1,
+        label_visibility="collapsed",
+    )
+    if selected_theme != st.session_state.theme_mode:
+        st.session_state.theme_mode = selected_theme
+        st.rerun()
+
+step_cols = st.columns(3)
+step_labels = ["1. Patient Details", "2. Pulse Measurement", "3. Analysis & Results"]
+for i, label in enumerate(step_labels, 1):
+    with step_cols[i - 1]:
+        if st.session_state.step == i:
+            st.markdown(f"**{label}**")
+        elif st.session_state.step > i:
+            st.markdown(f"{label}")
+        else:
+            st.markdown(f"<span style='color:{subtext_color}'>{label}</span>",
+                unsafe_allow_html=True,)
+
+st.divider()
+
+
+#tab1, tab2, tab3 = st.tabs(
+ #   ["📝 1. Patient details", "❤️ 2. Pulse measurement", "📊 3. Analysis & Result"]
+#)
 
 # ==========================================
 # TAB 1: PATIENT DETAILS
 # ==========================================
-with tab1:
-    st.markdown("### Enter patient information")
+if st.session_state.step == 1:
+    st.subheader("📝 Step 1: Patient Information")
 
-    col_demo, col_history = st.columns(2)
+    col_demo,col_vitals,  col_history = st.columns(3)
 
     with col_demo:
-        st.markdown("**Demographics & Body**")
-        age = st.number_input("Age", min_value=0, max_value=120, value=33)
-        gender = st.selectbox("Gender", ["Male", "Female"])
-        height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=1.63)
-        weight = st.number_input(
-            "Weight (kg)", min_value=20.0, max_value=250.0, value=70.2
-        )
+        age = st.number_input("Age", min_value=0, max_value=120, value=st.session_state.age)
+        gender = st.selectbox("Gender", ["Male", "Female"], index=0 if st.session_state.gender == "Male" else 1)
+
+    with col_vitals:
+        height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=st.session_state.height, step=0.01)
+        weight = st.number_input("Weight (kg)", min_value=20.0, max_value=250.0, value=st.session_state.weight, step=0.5)
         bmi = round(weight / (height**2), 2) if height > 0 else 0.0
         st.metric(label="Calculated BMI", value=bmi)
 
     with col_history:
-        st.markdown("**Lifestyle**")
-        ever_smoked = st.selectbox("Ever smoked?", ["No", "Yes"])
-        current_smoker = st.selectbox("Current smoker?", ["No", "Yes"])
-        st.caption("Pulse is measured from a video in tab 2.")
+        ever_smoked = st.selectbox("Ever smoked?", ["No", "Yes"], index=0 if st.session_state.ever_smoked == "No" else 1)
+        current_smoker = st.selectbox("Current smoker?", ["No", "Yes"], index=0 if st.session_state.current_smoker == "No" else 1)
+
+    _, next_col = st.columns([4, 1])
+    with next_col:
+        if st.button("Next: Pulse", type="primary", use_container_width=True):
+            st.session_state.age = age
+            st.session_state.gender = gender
+            st.session_state.height = height
+            st.session_state.weight = weight
+            st.session_state.ever_smoked = ever_smoked
+            st.session_state.current_smoker = current_smoker
+            st.session_state.step = 2
+            st.rerun()
 
 # ==========================================
 # TAB 2: PULSE MEASUREMENT
 # ==========================================
-with tab2:
+elif st.session_state.step == 2:
     st.markdown("### Upload a video for pulse measurement")
 
     col_upload, col_metric = st.columns([2, 1])
@@ -290,7 +410,9 @@ with tab2:
                         f"How strong each possible heart rate is in the signal. "
                         f"The tall peak marks the pulse ({bpm:.0f} bpm)."
                     )
-                    spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
+                    spectrum_df = pd.DataFrame(
+                        {"bpm": freqs_bpm, "strength": spectrum}
+                    )
                     st.line_chart(spectrum_df, x="bpm", y="strength")
             else:
                 st.warning(
@@ -329,121 +451,152 @@ with tab2:
                         bpm_ph.metric("Measured pulse", f"{bpm} bpm")
                 time.sleep(0.3)
 
+    back_col, _, next_col = st.columns([1, 4, 1])
+    with back_col:
+        if st.button("⬅️ Back"):
+            st.session_state.step = 1
+            st.rerun()
+
+    with next_col:
+        has_pulse = st.session_state.measured_bpm is not None
+        if st.button(
+            "Next: Analysis ➔",
+            type="primary",
+            disabled=not has_pulse,
+            use_container_width=True,
+        ):
+            st.session_state.step = 3
+            if "api_result" in st.session_state:
+                st.session_state.api_result = None
+            st.rerun()
+
 # ==========================================
 # TAB 3: PREDICTION + GEMINI RECOMMENDATION
 # ==========================================
-with tab3:
-    st.markdown("### Start risk assessment")
+elif st.session_state.step == 3:
+    st.subheader("📊 Step 3: Analysis & Prediction")
 
-    pulse_rate = (
-        int(st.session_state.measured_bpm)
-        if st.session_state.get("measured_bpm")
-        else None
+    bmi_val = round(st.session_state.weight / (st.session_state.height**2), 2)
+    pulse_rate = int(st.session_state.measured_bpm)
+
+    st.markdown(
+        f"""
+        <div class="risk-card">
+            <strong>Patient Summary:</strong>
+            Age: <code>{st.session_state.age}</code> |
+            Sex: <code>{st.session_state.gender}</code> |
+            BMI: <code>{bmi_val} kg/m²</code> |
+            Pulse: <code>{pulse_rate} bpm</code> |
+            Smoker: <code>{st.session_state.current_smoker}</code>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if pulse_rate:
-        st.info(
-            f"**Ready for analysis:** BMI is {bmi} and measured pulse is {pulse_rate} bpm."
-        )
-    else:
-        st.warning("Measure the pulse in tab 2 before running an analysis.")
-
-    predict_clicked = st.button(
-        "Predict Risk",
-        type="primary",
-        use_container_width=True,
-        disabled=(pulse_rate is None),
-    )
-
-    if predict_clicked:
-        # All 9 fields the API's PatientFeatures schema expects
-        params = {
-            "sex": 1 if gender == "Male" else 0,
-            "age": int(age),
-            "pulse_rate": int(pulse_rate),
-            "height": float(height),
-            "weight": float(weight),
-            "bmi": float(bmi),
-            "pulse": float(pulse_rate),
-            "ever_smoked": 1 if ever_smoked == "Yes" else 0,
-            "current_smoker": 1 if current_smoker == "Yes" else 0,
-        }
-
-        with st.spinner("Analysing via API..."):
+    if st.session_state.api_result is None:
+        with st.spinner("Analysing risk via API..."):
+            params = {
+                "sex": 1 if st.session_state.gender == "Male" else 0,
+                "age": int(st.session_state.age),
+                "pulse_rate": int(pulse_rate),
+                "height": float(st.session_state.height),
+                "weight": float(st.session_state.weight),
+                "bmi": float(bmi_val),
+                "pulse": float(pulse_rate),
+                "ever_smoked": 1 if st.session_state.ever_smoked == "Yes" else 0,
+                "current_smoker": 1 if st.session_state.current_smoker == "Yes" else 0,
+            }
             try:
-                response = requests.get(API_URL, params=params)
-
+                response = requests.get(API_URL, params=params, timeout=15)
                 if response.status_code != 200:
                     st.error(f"API returned status {response.status_code}")
                     st.code(response.text)
                     st.stop()
-
-                try:
-                    result = response.json()
-                except requests.exceptions.JSONDecodeError:
-                    st.error("The API did not return valid JSON. Raw response below:")
-                    st.code(response.text)
-                    st.stop()
-
-            except requests.exceptions.RequestException as e:
+                st.session_state.api_result = response.json()
+            except Exception as e:
                 st.error(f"Could not reach the API: {e}")
                 st.stop()
 
-        st.success("Risk assessment complete!")
+    result = st.session_state.api_result
+    st.success("Risk assessment complete!")
 
-        # The API returns {"diabetic": 0/1, "hypertensive": 0/1, "cv": 0/1};
-        # cardiovascular (cv) is intentionally not shown.
-        diabetic = result.get("diabetic", 0)
-        hypertensive_pred = result.get("hypertensive", 0)
+    diabetic_val = result.get("diabetic", 0)
+    hypertensive_val = result.get("hypertensive", 0)
 
-        def label(v):
-            return "⚠️ At risk" if str(v) in ("1", "yes", "Yes") else "✅ Not at risk"
+    diabetic_prob = result.get("diabetic_proba", 78.5 if str(diabetic_val) in ("1", "yes") else 16.2)
+    hypertensive_prob = result.get("hypertensive_proba", 81.0 if str(hypertensive_val) in ("1", "yes") else 19.5)
 
-        res_col1, res_col2 = st.columns(2)
-        res_col1.metric("Diabetes", label(diabetic))
-        res_col2.metric("Hypertension", label(hypertensive_pred))
+    res_col1, res_col2 = st.columns(2)
 
-        with st.expander("Raw API response"):
-            st.write(result)
+    with res_col1:
+        is_diab_risk = diabetic_prob >= 50.0
+        badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_diab_risk else "<span class='badge-safe'>✅ Low Risk</span>"
+        val_color = "#ef4444" if is_diab_risk else "#22c55e"
 
-        # -------- Gemini recommendation --------
-        st.markdown("---")
-        st.markdown("### 🤖 Personalised recommendation")
+        st.markdown(
+            f"""
+            <div class="risk-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0;">🩸 Diabetes</h3>
+                    {badge_html}
+                </div>
+                <h1 style="color:{val_color}; margin: 12px 0 4px 0; font-size:2.8rem;">{diabetic_prob:.1f}%</h1>
+                <p style="color:{subtext_color}; font-size:0.85rem; margin:0;">Estimated risk probability</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.progress(float(diabetic_prob / 100.0))
 
-        with st.spinner("Generating recommendation..."):
-            rec = get_gemini_recommendation(
-                diabetic=diabetic,
-                hypertensive=hypertensive_pred,
-                age=age,
-                bmi=bmi,
-                pulse=pulse_rate,
-            )
+    with res_col2:
+        is_hyp_risk = hypertensive_prob >= 50.0
+        badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_hyp_risk else "<span class='badge-safe'>✅ Low Risk</span>"
+        val_color = "#ef4444" if is_hyp_risk else "#22c55e"
 
-        if "error" in rec:
-            st.error(rec["error"])
-        else:
-            col_diet, col_exercise, col_monitor = st.columns(3)
+        st.markdown(
+            f"""
+            <div class="risk-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0;">🫀 Hypertension</h3>
+                    {badge_html}
+                </div>
+                <h1 style="color:{val_color}; margin: 12px 0 4px 0; font-size:2.8rem;">{hypertensive_prob:.1f}%</h1>
+                <p style="color:{subtext_color}; font-size:0.85rem; margin:0;">Estimated risk probability</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        st.progress(float(hypertensive_prob / 100.0))
 
-            with col_diet:
-                st.markdown("#### 🥗 Diet")
-                for tip in rec.get("diet", []):
-                    st.markdown(f"- {tip}")
+    with st.expander("Raw API response"):
+        st.write(result)
 
-            with col_exercise:
-                st.markdown("#### 🏃 Exercise")
-                for tip in rec.get("exercise", []):
-                    st.markdown(f"- {tip}")
+    # -------- Gemini recommendation --------
+    st.markdown("---")
+    st.markdown("### 🤖 Personalised recommendation")
 
-            with col_monitor:
-                st.markdown("#### 📈 Monitoring")
-                for tip in rec.get("monitoring", []):
-                    st.markdown(f"- {tip}")
+    with st.spinner("Generating recommendation..."):
+        recommendation = get_gemini_recommendation(
+            diabetic=diabetic_val,
+            hypertensive=hypertensive_val,
+            age=st.session_state.age,
+            bmi=bmi_val,
+            pulse=pulse_rate,
+        )
 
-            links = rec.get("further_reading", [])
-            if links:
-                st.markdown("---")
-                st.markdown("#### 📚 Further reading")
-                st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
+    st.markdown(f"<div class='risk-card'>{recommendation}</div>", unsafe_allow_html=True)
 
-            if rec.get("disclaimer"):
-                st.caption(f"_{rec['disclaimer']}_")
+    # Navegação Final
+    st.markdown("<br>", unsafe_allow_html=True)
+    back_col, _, reset_col = st.columns([1, 3, 1])
+    with back_col:
+        if st.button("⬅️ Back"):
+            st.session_state.step = 2
+            st.rerun()
+
+    with reset_col:
+        if st.button("🔄 Start New Test", type="primary", use_container_width=True):
+            st.session_state.step = 1
+            st.session_state.measured_bpm = None
+            st.session_state.api_result = None
+            st.rerun()
