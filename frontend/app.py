@@ -15,6 +15,8 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())  # finds .env even from the frontend/ folder; never commit it
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
+st.write("Nyckel laddad:", bool(GEMINI_API_KEY), "längd:", len(GEMINI_API_KEY or ""))
+
 API_URL = os.environ.get(
     "API_URL", "https://pulseiq-api-431111687933.europe-west1.run.app/predict"
 )
