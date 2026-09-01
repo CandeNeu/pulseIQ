@@ -1,0 +1,19 @@
+{
+    "model": "xgboost",
+    "target": "diabetes",
+    "best_roc_auc": 0.80901,
+    "params": {
+        "n_estimators": 300,
+        "max_depth": 3,
+        "learning_rate": 0.011753853006894882,
+        "min_child_weight": 10,
+        "subsample": 0.6470618315373587,
+        "colsample_bytree": 0.9496372466130184,
+        "gamma": 0.2781666710843583,
+        "reg_alpha": 3.103898379238662e-07,
+        "reg_lambda": 9.90503158593131e-05,
+        "eval_metric": "logloss",
+        "random_state": 42,
+        "n_jobs": -1
+    }
+}

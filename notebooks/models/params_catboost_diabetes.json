@@ -1,0 +1,14 @@
+{
+    "model": "catboost",
+    "target": "diabetes",
+    "best_roc_auc": 0.81425,
+    "params": {
+        "iterations": 900,
+        "depth": 5,
+        "learning_rate": 0.0317126878114682,
+        "l2_leaf_reg": 5.410764763310072,
+        "random_seed": 42,
+        "verbose": 0,
+        "thread_count": -1
+    }
+}

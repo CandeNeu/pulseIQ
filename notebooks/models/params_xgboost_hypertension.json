@@ -1,0 +1,19 @@
+{
+    "model": "xgboost",
+    "target": "hypertension",
+    "best_roc_auc": 0.80779,
+    "params": {
+        "n_estimators": 100,
+        "max_depth": 3,
+        "learning_rate": 0.020986048296546725,
+        "min_child_weight": 8,
+        "subsample": 0.5123449486634905,
+        "colsample_bytree": 0.9521339541325244,
+        "gamma": 2.1969282964106166e-05,
+        "reg_alpha": 8.965589215433882e-05,
+        "reg_lambda": 0.3852761686726348,
+        "eval_metric": "logloss",
+        "random_state": 42,
+        "n_jobs": -1
+    }
+}
