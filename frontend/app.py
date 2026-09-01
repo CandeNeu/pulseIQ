@@ -372,7 +372,6 @@ with tab3:
                 hypertensive=hypertensive_pred,
                 age=age,
                 bmi=bmi,
-                glucose=glucose,
                 pulse=pulse_rate,
             )
 
