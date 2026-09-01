@@ -552,8 +552,8 @@ elif st.session_state.step == 3:
     diabetic_raw = float(result.get("diabetic", 0.0))
     hypertensive_raw = float(result.get("hypertensive", 0.0))
 
-    diabetic_prob = round((1.0 - diabetic_raw) * 100, 1)
-    hypertensive_prob = round((1.0 - hypertensive_raw) * 100, 1)
+    diabetic_prob = round((diabetic_raw) * 100, 1)
+    hypertensive_prob = round((hypertensive_raw) * 100, 1)
 
     diabetic_val = 1 if diabetic_prob >= 50 else 0
     hypertensive_val = 1 if hypertensive_prob >= 50 else 0
