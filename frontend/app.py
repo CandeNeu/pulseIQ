@@ -9,11 +9,10 @@ import imageio.v3 as iio
 from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
-from dotenv import load_dotenv, find_dotenv
+import json
 
-# ============ Environment / secrets ============
-load_dotenv(find_dotenv())  # finds .env even from the frontend/ folder; never commit it
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+
 
 API_URL = os.environ.get(
     "API_URL", "https://pulseiq-api-431111687933.europe-west1.run.app/predict"
@@ -28,7 +27,6 @@ st.markdown(
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Constrain the content width and add breathing room on the sides */
     .block-container {
         max-width: 1000px;
         padding-top: 2rem;
@@ -119,56 +117,104 @@ def extract_signal_from_video(video_bytes, max_frames=300):
     return signal, fps
 
 
-@st.cache_data(show_spinner=False)
-def get_gemini_recommendation(diabetic, hypertensive, age, bmi, glucose, pulse):
-    """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation.
+def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
+    """Ask Gemini for a structured lifestyle recommendation.
 
-    Cached: identical inputs return instantly without another API call. Scalar
-    args (not a dict) so Streamlit can hash them for the cache. The API key is
-    sent in a header (never in the URL). Retries on transient 503/429.
+    Returns a dict with keys: diet, exercise, monitoring (each a list of strings),
+    further_reading (list of {title, url}) and disclaimer. On error returns a dict
+    with an 'error' key instead.
     """
     if not GEMINI_API_KEY:
-        return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
+        return {
+            "error": "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
+        }
+
+    safe_api_key = GEMINI_API_KEY.strip()
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-3.5-flash-lite:generateContent"
+        "gemini-3.5-flash:generateContent"
     )
-    headers = {"x-goog-api-key": GEMINI_API_KEY}
+    headers = {"x-goog-api-key": safe_api_key, "Content-Type": "application/json"}
 
-    prompt = f"""You are a helpful health assistant. Based on the data below, write a
-short, friendly set of lifestyle recommendations (diet, exercise, monitoring, and
-when to see a doctor). Do NOT give a diagnosis. Keep it to 4-6 concise bullet points
-and add a one-line disclaimer that this is not medical advice.
+    diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
+    ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
-Patient: age {age}, BMI {bmi}, glucose {glucose}, resting pulse {pulse} bpm.
-Model predictions (1 = at risk, 0 = not at risk):
-- Diabetic: {diabetic}
-- Hypertensive: {hypertensive}
+    system_instruction = """You are an empathetic, knowledgeable health and lifestyle educator.
+Return lifestyle recommendations as JSON ONLY — no markdown, no code fences, no text outside the JSON object.
+
+The JSON must have exactly this shape:
+{
+  "diet": ["detailed tip 1", "detailed tip 2"],
+  "exercise": ["detailed tip 1", "detailed tip 2"],
+  "monitoring": ["detailed tip 1", "detailed tip 2"],
+  "further_reading": [{"title": "WHO – Healthy diet", "url": "https://www.who.int/..."}],
+  "disclaimer": "one-line disclaimer text"
+}
+
+RULES:
+1. Each list should have 2-4 detailed, verbose tips that explain the reasoning, not just the instruction.
+2. Where relevant, include concrete statistics (e.g. 150 minutes/week of moderate activity, healthy BMI range 18.5-24.9) and briefly attribute the source type (WHO, CDC, ADA, NHS).
+3. "further_reading" must contain 3-5 links using only these real domains: who.int, cdc.gov, diabetes.org, nhs.uk, mayoclinic.org. Prefer main topic pages; do not invent deep URLs.
+4. NEVER provide a medical diagnosis or diagnostic language.
+5. The "disclaimer" value must be exactly: "This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional."
+6. Output valid JSON only.
 """
 
+    user_prompt = f"""Patient Profile:
+- Age: {age}
+- BMI: {bmi}
+- Resting Pulse: {pulse} bpm
+
+Machine Learning Risk Assessment:
+- Diabetes: {diabetes_status}
+- Hypertension: {ht_status}
+
+Generate the recommendations as JSON."""
+
     body = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 400,
-            "thinkingConfig": {"thinkingBudget": 0},  # 0 = no thinking -> fastest
+            "maxOutputTokens": 1500,
+            "temperature": 0.3,
+            "responseMimeType": "application/json",  # force strict JSON
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
-    for attempt in range(3):  # retry on transient overload / rate limit
+    for attempt in range(3):
         try:
             resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            text = (
+                text.strip()
+                .removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+            return json.loads(text)
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
             if status in (503, 429) and attempt < 2:
                 time.sleep(2)
                 continue
-            return "The recommendation service is busy right now. Please try again in a moment."
+            try:
+                error_details = (
+                    e.response.json()
+                    .get("error", {})
+                    .get("message", "Unknown API error")
+                )
+            except Exception:
+                error_details = "Could not parse API error response."
+            return {"error": f"**API Error {status}:** `{error_details}`"}
         except (KeyError, IndexError):
-            return "Gemini returned an unexpected response."
+            return {"error": "Gemini returned an unexpected response format."}
+        except json.JSONDecodeError:
+            return {"error": "Gemini did not return valid JSON. Try again."}
 
 
 # ============ Tabs ============
@@ -182,7 +228,7 @@ tab1, tab2, tab3 = st.tabs(
 with tab1:
     st.markdown("### Enter patient information")
 
-    col_demo, col_vitals, col_history = st.columns(3)
+    col_demo, col_history = st.columns(2)
 
     with col_demo:
         st.markdown("**Demographics & Body**")
@@ -195,24 +241,11 @@ with tab1:
         bmi = round(weight / (height**2), 2) if height > 0 else 0.0
         st.metric(label="Calculated BMI", value=bmi)
 
-        ever_smoked = st.selectbox("Ever smoked?", ["Yes", "No"])
-        current_smoker = st.selectbox("Current smoker?", ["Yes", "No"])
-
-    with col_vitals:
-        st.markdown("**Vital signs**")
-        systolic_bp = st.number_input("Systolic BP", value=106)
-        diastolic_bp = st.number_input("Diastolic BP", value=67)
-        glucose = st.number_input("Glucose", value=5.81)
-
     with col_history:
-        st.markdown("**Medical history**")
-        family_diabetes = st.selectbox("Family history of diabetes", ["No", "Yes"])
-        hypertensive = st.selectbox("Hypertensive", ["No", "Yes"])
-        family_hypertension = st.selectbox(
-            "Family history of hypertension", ["No", "Yes"]
-        )
-        cardiovascular = st.selectbox("Cardiovascular disease", ["No", "Yes"])
-        stroke = st.selectbox("Stroke", ["No", "Yes"])
+        st.markdown("**Lifestyle**")
+        ever_smoked = st.selectbox("Ever smoked?", ["No", "Yes"])
+        current_smoker = st.selectbox("Current smoker?", ["No", "Yes"])
+        st.caption("Pulse is measured from a video in tab 2.")
 
 # ==========================================
 # TAB 2: PULSE MEASUREMENT
@@ -321,24 +354,20 @@ with tab3:
         use_container_width=True,
         disabled=(pulse_rate is None),
     )
-    # 1. Capture the inputs from your UI first (Streamlit example)
 
     if predict_clicked:
-        try:
-            params = {
-                "sex": 1 if gender == "Male" else 0,
-                "age": int(age or 0),
-                "pulse_rate": int(pulse_rate or 0),
-                "height": float(height or 0.0),
-                "weight": float(weight or 0.0),
-                "bmi": float(bmi or 0.0),
-                "pulse": float(pulse_rate or 0.0),
-                "ever_smoked": 1 if ever_smoked == "Yes" else 0,
-                "current_smoker": 1 if current_smoker == "Yes" else 0,
-            }
-            # Run your prediction here
-        except ValueError:
-            print("Please ensure all numeric fields are filled out correctly.")
+        # All 9 fields the API's PatientFeatures schema expects
+        params = {
+            "sex": 1 if gender == "Male" else 0,
+            "age": int(age),
+            "pulse_rate": int(pulse_rate),
+            "height": float(height),
+            "weight": float(weight),
+            "bmi": float(bmi),
+            "pulse": float(pulse_rate),
+            "ever_smoked": 1 if ever_smoked == "Yes" else 0,
+            "current_smoker": 1 if current_smoker == "Yes" else 0,
+        }
 
         with st.spinner("Analysing via API..."):
             try:
@@ -377,18 +406,44 @@ with tab3:
         with st.expander("Raw API response"):
             st.write(result)
 
-        # -------- Gemini recommendation (fast, cached) --------
+        # -------- Gemini recommendation --------
         st.markdown("---")
         st.markdown("### 🤖 Personalised recommendation")
 
         with st.spinner("Generating recommendation..."):
-            recommendation = get_gemini_recommendation(
+            rec = get_gemini_recommendation(
                 diabetic=diabetic,
                 hypertensive=hypertensive_pred,
                 age=age,
                 bmi=bmi,
-                glucose=glucose,
                 pulse=pulse_rate,
             )
 
-        st.markdown(recommendation)
+        if "error" in rec:
+            st.error(rec["error"])
+        else:
+            col_diet, col_exercise, col_monitor = st.columns(3)
+
+            with col_diet:
+                st.markdown("#### 🥗 Diet")
+                for tip in rec.get("diet", []):
+                    st.markdown(f"- {tip}")
+
+            with col_exercise:
+                st.markdown("#### 🏃 Exercise")
+                for tip in rec.get("exercise", []):
+                    st.markdown(f"- {tip}")
+
+            with col_monitor:
+                st.markdown("#### 📈 Monitoring")
+                for tip in rec.get("monitoring", []):
+                    st.markdown(f"- {tip}")
+
+            links = rec.get("further_reading", [])
+            if links:
+                st.markdown("---")
+                st.markdown("#### 📚 Further reading")
+                st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
+
+            if rec.get("disclaimer"):
+                st.caption(f"_{rec['disclaimer']}_")

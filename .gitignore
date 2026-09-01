@@ -1,11 +1,11 @@
 raw_data/
 # ML Models and Artifacts
-/models/
+models/
 *.pkl
 *.h5
 *.joblib
 *.pt
-
+notebooks/models
 .env
 *.zip
 # Byte-compiled / optimized / DLL files
@@ -15,7 +15,7 @@ __pycache__/
 *.img
 
 example/
-
+frontend/.streamlit/secrets.toml
 # Mac OS
 .DS_Store
 .AppleDouble
