@@ -339,7 +339,7 @@ st.divider()
 if st.session_state.step == 1:
     st.subheader("📝 Step 1: Patient Information")
 
-    col_demo, col_history = st.columns(2)
+    col_demo,col_vitals,  col_history = st.columns(3)
 
     with col_demo:
         age = st.number_input("Age", min_value=0, max_value=120, value=st.session_state.age)
