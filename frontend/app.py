@@ -120,21 +120,20 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
-    """Ask Gemini for a lifestyle recommendation."""
+    """Ask Gemini for a lifestyle recommendation securely."""
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
-    # 1. Lägg API-nyckeln direkt i URL:en istället för i headers
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    )
+    # 1. Tvätta API-nyckeln från dolda mellanslag och radbrytningar
+    safe_api_key = GEMINI_API_KEY.strip()
 
-    # 1. Translate binary flags into semantic text for better LLM reasoning
+    # 2. Använd header för säkerhet (ALDRIG i URL:en)
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    headers = {"x-goog-api-key": safe_api_key, "Content-Type": "application/json"}
+
     diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
     ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
-    # 2. Define the System Instruction (The Persona and Rules)
     system_instruction = """You are an empathetic health and lifestyle educator.
 Your task is to provide practical, everyday lifestyle tips based on the user's risk profile.
 
@@ -146,7 +145,6 @@ STRICT RULES:
    "*Disclaimer: This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional.*"
 """
 
-    # 3. Define the User Content (The Data)
     user_prompt = f"""Patient Profile:
 - Age: {age}
 - BMI: {bmi}
@@ -164,31 +162,35 @@ Please generate the recommendations."""
         "generationConfig": {
             "maxOutputTokens": 400,
             "temperature": 0.3,
-            # 2. Ta bort "thinkingConfig" helt, eftersom 1.5-flash inte stöder det.
         },
     }
 
     for attempt in range(3):
         try:
-            # 3. Skicka anropet utan det manuella "headers"-objektet
-            resp = requests.post(url, json=body, timeout=30)
+            resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
 
-            error_details = (
-                e.response.text if hasattr(e, "response") and e.response else str(e)
-            )
-
             if status in (503, 429) and attempt < 2:
                 time.sleep(2)
                 continue
 
-            return f"**API Error {status}:** `{error_details}`"
+            # 3. Extrahera felet men maskera URL/Nycklar helt
+            try:
+                error_details = (
+                    e.response.json()
+                    .get("error", {})
+                    .get("message", "Unknown API error")
+                )
+            except Exception:
+                error_details = "Could not parse API error response."
+
+            return f"**API Error {status}:** `{error_details}`. (Check that your API key is valid and the model name is correct)."
         except (KeyError, IndexError):
-            return "Gemini returned an unexpected response."
+            return "Gemini returned an unexpected response format."
 
 
 # ============ Tabs ============
