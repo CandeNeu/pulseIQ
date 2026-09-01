@@ -9,6 +9,7 @@ import imageio.v3 as iio
 from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
+import json
 
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
