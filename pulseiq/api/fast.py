@@ -33,15 +33,16 @@ def root():
 
 @app.get("/predict")
 def predict_diabetis(
+    
     features: PatientFeatures = Depends(),
 ):
     diabetic_model = app.state.diabetic
     data = pd.DataFrame(features.model_dump(), index=[0])
-    diabetic_prediction = float(diabetic_model.predict(data)[0])
+    diabetic_prediction = round(float(diabetic_model.predict_proba(data)[0][0]), 2)
 
     hypertensive_model = app.state.hypertensive
 
-    hypertensive_prediction = float(hypertensive_model.predict(data)[0])
+    hypertensive_prediction = round(float(hypertensive_model.predict_proba(data)[0][0]), 2)
 
 
     return {
