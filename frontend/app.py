@@ -615,15 +615,18 @@ elif st.session_state.step == 3:
     st.markdown("---")
     st.markdown("### 🤖 Personalised recommendation")
 
-    if st.session_state.get("recommendation") is None:
-        with st.spinner("Generating recommendation..."):
-            st.session_state.recommendation = get_gemini_recommendation(
-                diabetic=diabetic_val,
-                hypertensive=hypertensive_val,
-                age=st.session_state.age,
-                bmi=bmi_val,
-                pulse=pulse_rate,
-            )
+    if st.session_state.recommendation is None:
+        if st.button("✨ Get recommendation", type="primary", use_container_width=True):
+            with st.spinner("Generating recommendation..."):
+                st.session_state.recommendation = get_gemini_recommendation(
+                    diabetic=diabetic_val,
+                    hypertensive=hypertensive_val,
+                    age=st.session_state.age,
+                    bmi=bmi_val,
+                    pulse=pulse_rate,
+                )
+            st.rerun()
+
     rec = st.session_state.recommendation
 
     if "error" in rec:
