@@ -608,8 +608,8 @@ elif st.session_state.step == 3:
         )
         st.progress(float(hypertensive_prob / 100.0))
 
-    with st.expander("Raw API response"):
-        st.write(result)
+    # with st.expander("Raw API response"):
+    #    st.write(result)
 
     # -------- Gemini recommendation --------
     st.markdown("---")
