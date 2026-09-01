@@ -632,6 +632,16 @@ elif st.session_state.step == 3:
     if rec is not None:
         if "error" in rec:
             st.error(rec["error"])
+            if st.button("🔄 Retry", type="primary", use_container_width=True):
+                with st.spinner("Retrying recommendation..."):
+                    st.session_state.recommendation = get_gemini_recommendation(
+                        diabetic=diabetic_val,
+                        hypertensive=hypertensive_val,
+                        age=st.session_state.age,
+                        bmi=bmi_val,
+                        pulse=pulse_rate,
+                    )
+                st.rerun()
         else:
             col_diet, col_exercise, col_monitor = st.columns(3)
 
