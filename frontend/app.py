@@ -409,7 +409,7 @@ with tab3:
         st.markdown("---")
         st.markdown("### 🤖 Personalised recommendation")
 
-                with st.spinner("Generating recommendation..."):
+        with st.spinner("Generating recommendation..."):
             rec = get_gemini_recommendation(
                 diabetic=diabetic,
                 hypertensive=hypertensive_pred,
