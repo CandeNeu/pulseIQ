@@ -547,15 +547,11 @@ elif st.session_state.step == 3:
     result = st.session_state.api_result
     st.success("Risk assessment complete!")
 
-    diabetic_val = result.get("diabetic", 0)
-    hypertensive_val = result.get("hypertensive", 0)
+    diabetic_prob = result.get("diabetic_proba", 0.0)
+    hypertensive_prob = result.get("hypertensive_proba", 0.0)
 
-    diabetic_prob = result.get(
-        "diabetic_proba", 78.5 if str(diabetic_val) in ("1", "yes") else 16.2
-    )
-    hypertensive_prob = result.get(
-        "hypertensive_proba", 81.0 if str(hypertensive_val) in ("1", "yes") else 19.5
-    )
+    diabetic_val = result.get("diabetic", 1 if diabetic_prob >= 50 else 0)
+    hypertensive_val = result.get("hypertensive", 1 if hypertensive_prob >= 50 else 0)
 
     res_col1, res_col2 = st.columns(2)
 
