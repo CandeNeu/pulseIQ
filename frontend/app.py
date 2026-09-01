@@ -72,6 +72,10 @@ if "signal_buffer" not in st.session_state:
     st.session_state.signal_buffer = deque(maxlen=300)  # ~10s @ 30fps
 if "measured_bpm" not in st.session_state:
     st.session_state.measured_bpm = None
+if "api_result" not in st.session_state:
+    st.session_state.api_result = None
+if "recommendation" not in st.session_state:
+    st.session_state.recommendation = None
 lock = threading.Lock()
 signal_buffer = st.session_state.signal_buffer
 
@@ -298,7 +302,7 @@ Generate the recommendations as JSON."""
             return {"error": "Gemini did not return valid JSON. Try again."}
 
 
-# ============ Tabs ============
+# ============ Header + step indicator ============
 header_col, theme_col = st.columns([5, 1])
 
 with header_col:
@@ -332,12 +336,8 @@ for i, label in enumerate(step_labels, 1):
 st.divider()
 
 
-# tab1, tab2, tab3 = st.tabs(
-#   ["📝 1. Patient details", "❤️ 2. Pulse measurement", "📊 3. Analysis & Result"]
-# )
-
 # ==========================================
-# TAB 1: PATIENT DETAILS
+# STEP 1: PATIENT DETAILS
 # ==========================================
 if st.session_state.step == 1:
     st.subheader("📝 Step 1: Patient Information")
@@ -397,7 +397,7 @@ if st.session_state.step == 1:
             st.rerun()
 
 # ==========================================
-# TAB 2: PULSE MEASUREMENT
+# STEP 2: PULSE MEASUREMENT
 # ==========================================
 elif st.session_state.step == 2:
     st.markdown("### Upload a video for pulse measurement")
@@ -493,12 +493,12 @@ elif st.session_state.step == 2:
             use_container_width=True,
         ):
             st.session_state.step = 3
-            if "api_result" in st.session_state:
-                st.session_state.api_result = None
+            st.session_state.api_result = None
+            st.session_state.recommendation = None
             st.rerun()
 
 # ==========================================
-# TAB 3: PREDICTION + GEMINI RECOMMENDATION
+# STEP 3: PREDICTION + GEMINI RECOMMENDATION
 # ==========================================
 elif st.session_state.step == 3:
     st.subheader("📊 Step 3: Analysis & Prediction")
