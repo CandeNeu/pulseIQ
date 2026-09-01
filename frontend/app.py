@@ -120,12 +120,7 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
-    """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation.
-
-    Cached: identical inputs return instantly without another API call. Scalar
-    args (not a dict) so Streamlit can hash them for the cache. The API key is
-    sent in a header (never in the URL). Retries on transient 503/429.
-    """
+    """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation."""
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
@@ -135,26 +130,45 @@ def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
     )
     headers = {"x-goog-api-key": GEMINI_API_KEY}
 
-    prompt = f"""You are a helpful health assistant. Based on the data below, write a
-short, friendly set of lifestyle recommendations (diet, exercise, monitoring, and
-when to see a doctor). Do NOT give a diagnosis. Keep it to 4-6 concise bullet points
-and add a one-line disclaimer that this is not medical advice.
+    # 1. Translate binary flags into semantic text for better LLM reasoning
+    diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
+    ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
-Patient: age {age}, BMI {bmi}, glucose {glucose}, resting pulse {pulse} bpm.
-Model predictions (1 = at risk, 0 = not at risk):
-- Diabetic: {diabetic}
-- Hypertensive: {hypertensive}
+    # 2. Define the System Instruction (The Persona and Rules)
+    system_instruction = """You are an empathetic health and lifestyle educator.
+Your task is to provide practical, everyday lifestyle tips based on the user's risk profile.
+
+STRICT RULES:
+1. Provide exactly 4 to 6 concise bullet points.
+2. Group the tips across: Diet, Exercise, and General Monitoring.
+3. NEVER provide a medical diagnosis or use diagnostic language.
+4. Always end the response with this exact disclaimer:
+   "*Disclaimer: This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional.*"
 """
 
+    # 3. Define the User Content (The Data)
+    user_prompt = f"""Patient Profile:
+- Age: {age}
+- BMI: {bmi}
+- Resting Pulse: {pulse} bpm
+
+Machine Learning Risk Assessment:
+- Diabetes: {diabetes_status}
+- Hypertension: {ht_status}
+
+Please generate the recommendations."""
+
     body = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {
             "maxOutputTokens": 400,
-            "thinkingConfig": {"thinkingBudget": 0},  # 0 = no thinking -> fastest
+            "temperature": 0.3,  # Low temperature for more consistent, clinical tone
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
-    for attempt in range(3):  # retry on transient overload / rate limit
+    for attempt in range(3):
         try:
             resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp.raise_for_status()
