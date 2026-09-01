@@ -119,7 +119,7 @@ def extract_signal_from_video(video_bytes, max_frames=300):
     return signal, fps
 
 
-def get_gemini_recommendation(diabetic, hypertensive, age, bmi, glucose, pulse):
+def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
     """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation.
 
     Cached: identical inputs return instantly without another API call. Scalar
