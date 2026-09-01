@@ -128,7 +128,10 @@ def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
     safe_api_key = GEMINI_API_KEY.strip()
 
     # 2. Använd header för säkerhet (ALDRIG i URL:en)
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "gemini-3.1-flash-lite-preview:generateContent"
+    )
     headers = {"x-goog-api-key": safe_api_key, "Content-Type": "application/json"}
 
     diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
