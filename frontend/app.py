@@ -117,9 +117,16 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
-    """Ask Gemini for a lifestyle recommendation. Key sent in a header, never the URL."""
+    """Ask Gemini for a structured lifestyle recommendation.
+
+    Returns a dict with keys: diet, exercise, monitoring (each a list of strings),
+    further_reading (list of {title, url}) and disclaimer. On error returns a dict
+    with an 'error' key instead.
+    """
     if not GEMINI_API_KEY:
-        return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
+        return {
+            "error": "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
+        }
 
     safe_api_key = GEMINI_API_KEY.strip()
 
@@ -133,16 +140,24 @@ def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
     ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
     system_instruction = """You are an empathetic, knowledgeable health and lifestyle educator.
-Your task is to provide a thorough, well-explained set of lifestyle recommendations based on the user's risk profile.
+Return lifestyle recommendations as JSON ONLY — no markdown, no code fences, no text outside the JSON object.
 
-STRICT RULES:
-1. Be detailed and verbose. Explain the reasoning behind each recommendation, not just the instruction itself.
-2. Organise the answer with clear markdown headings for Diet, Exercise, and General Monitoring, using bullet points within each section.
-3. Support recommendations with concrete statistics and figures where relevant (e.g. recommended 150 minutes/week of moderate aerobic activity, healthy BMI range 18.5-24.9, typical blood-sugar and blood-pressure targets) and briefly attribute the type of source (e.g. WHO, CDC, ADA, NHS).
-4. End with a "Further reading" section containing 3-5 links to reputable, stable health organisations. Only use real, well-known URLs from these domains: who.int, cdc.gov, diabetes.org, nhs.uk, mayoclinic.org. Do NOT invent URLs or link to specific deep pages you are unsure exist — prefer the organisation's main topic page.
-5. NEVER provide a medical diagnosis or use diagnostic language.
-6. Always end the response with this exact disclaimer:
-   "*Disclaimer: This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional.*"
+The JSON must have exactly this shape:
+{
+  "diet": ["detailed tip 1", "detailed tip 2"],
+  "exercise": ["detailed tip 1", "detailed tip 2"],
+  "monitoring": ["detailed tip 1", "detailed tip 2"],
+  "further_reading": [{"title": "WHO – Healthy diet", "url": "https://www.who.int/..."}],
+  "disclaimer": "one-line disclaimer text"
+}
+
+RULES:
+1. Each list should have 2-4 detailed, verbose tips that explain the reasoning, not just the instruction.
+2. Where relevant, include concrete statistics (e.g. 150 minutes/week of moderate activity, healthy BMI range 18.5-24.9) and briefly attribute the source type (WHO, CDC, ADA, NHS).
+3. "further_reading" must contain 3-5 links using only these real domains: who.int, cdc.gov, diabetes.org, nhs.uk, mayoclinic.org. Prefer main topic pages; do not invent deep URLs.
+4. NEVER provide a medical diagnosis or diagnostic language.
+5. The "disclaimer" value must be exactly: "This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional."
+6. Output valid JSON only.
 """
 
     user_prompt = f"""Patient Profile:
@@ -154,7 +169,7 @@ Machine Learning Risk Assessment:
 - Diabetes: {diabetes_status}
 - Hypertension: {ht_status}
 
-Please generate the recommendations."""
+Generate the recommendations as JSON."""
 
     body = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
@@ -162,7 +177,8 @@ Please generate the recommendations."""
         "generationConfig": {
             "maxOutputTokens": 1500,
             "temperature": 0.3,
-            "thinkingConfig": {"thinkingBudget": 0},  # no thinking -> fastest
+            "responseMimeType": "application/json",  # force strict JSON
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
@@ -171,7 +187,15 @@ Please generate the recommendations."""
             resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            text = (
+                text.strip()
+                .removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+            return json.loads(text)
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
             if status in (503, 429) and attempt < 2:
@@ -185,9 +209,11 @@ Please generate the recommendations."""
                 )
             except Exception:
                 error_details = "Could not parse API error response."
-            return f"**API Error {status}:** `{error_details}`"
+            return {"error": f"**API Error {status}:** `{error_details}`"}
         except (KeyError, IndexError):
-            return "Gemini returned an unexpected response format."
+            return {"error": "Gemini returned an unexpected response format."}
+        except json.JSONDecodeError:
+            return {"error": "Gemini did not return valid JSON. Try again."}
 
 
 # ============ Tabs ============
@@ -383,8 +409,8 @@ with tab3:
         st.markdown("---")
         st.markdown("### 🤖 Personalised recommendation")
 
-        with st.spinner("Generating recommendation..."):
-            recommendation = get_gemini_recommendation(
+                with st.spinner("Generating recommendation..."):
+            rec = get_gemini_recommendation(
                 diabetic=diabetic,
                 hypertensive=hypertensive_pred,
                 age=age,
@@ -392,4 +418,31 @@ with tab3:
                 pulse=pulse_rate,
             )
 
-        st.markdown(recommendation)
+        if "error" in rec:
+            st.error(rec["error"])
+        else:
+            col_diet, col_exercise, col_monitor = st.columns(3)
+
+            with col_diet:
+                st.markdown("#### 🥗 Diet")
+                for tip in rec.get("diet", []):
+                    st.markdown(f"- {tip}")
+
+            with col_exercise:
+                st.markdown("#### 🏃 Exercise")
+                for tip in rec.get("exercise", []):
+                    st.markdown(f"- {tip}")
+
+            with col_monitor:
+                st.markdown("#### 📈 Monitoring")
+                for tip in rec.get("monitoring", []):
+                    st.markdown(f"- {tip}")
+
+            links = rec.get("further_reading", [])
+            if links:
+                st.markdown("---")
+                st.markdown("#### 📚 Further reading")
+                st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
+
+            if rec.get("disclaimer"):
+                st.caption(f"_{rec['disclaimer']}_")
