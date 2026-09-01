@@ -15,7 +15,7 @@ __pycache__/
 *.img
 
 example/
-
+frontend/.streamlit/secrets.toml
 # Mac OS
 .DS_Store
 .AppleDouble

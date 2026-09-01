@@ -9,11 +9,8 @@ import imageio.v3 as iio
 from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
-from dotenv import load_dotenv, find_dotenv
 
-# ============ Environment / secrets ============
-load_dotenv(find_dotenv())  # finds .env even from the frontend/ folder; never commit it
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 
 API_URL = os.environ.get(
@@ -128,7 +125,7 @@ def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-flash-latest:generateContent"
+        "gemini-3.5-flash:generateContent"
     )
     headers = {"x-goog-api-key": safe_api_key, "Content-Type": "application/json"}
 
