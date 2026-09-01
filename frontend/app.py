@@ -132,14 +132,16 @@ def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
     diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
     ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
-    system_instruction = """You are an empathetic health and lifestyle educator.
-Your task is to provide practical, everyday lifestyle tips based on the user's risk profile.
+    system_instruction = """You are an empathetic, knowledgeable health and lifestyle educator.
+Your task is to provide a thorough, well-explained set of lifestyle recommendations based on the user's risk profile.
 
 STRICT RULES:
-1. Provide exactly 4 to 6 concise bullet points.
-2. Group the tips across: Diet, Exercise, and General Monitoring.
-3. NEVER provide a medical diagnosis or use diagnostic language.
-4. Always end the response with this exact disclaimer:
+1. Be detailed and verbose. Explain the reasoning behind each recommendation, not just the instruction itself.
+2. Organise the answer with clear markdown headings for Diet, Exercise, and General Monitoring, using bullet points within each section.
+3. Support recommendations with concrete statistics and figures where relevant (e.g. recommended 150 minutes/week of moderate aerobic activity, healthy BMI range 18.5-24.9, typical blood-sugar and blood-pressure targets) and briefly attribute the type of source (e.g. WHO, CDC, ADA, NHS).
+4. End with a "Further reading" section containing 3-5 links to reputable, stable health organisations. Only use real, well-known URLs from these domains: who.int, cdc.gov, diabetes.org, nhs.uk, mayoclinic.org. Do NOT invent URLs or link to specific deep pages you are unsure exist — prefer the organisation's main topic page.
+5. NEVER provide a medical diagnosis or use diagnostic language.
+6. Always end the response with this exact disclaimer:
    "*Disclaimer: This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional.*"
 """
 
@@ -158,7 +160,7 @@ Please generate the recommendations."""
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 400,
+            "maxOutputTokens": 1500,
             "temperature": 0.3,
             "thinkingConfig": {"thinkingBudget": 0},  # no thinking -> fastest
         },
