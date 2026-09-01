@@ -119,7 +119,6 @@ def extract_signal_from_video(video_bytes, max_frames=300):
     return signal, fps
 
 
-@st.cache_data(show_spinner=False)
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, glucose, pulse):
     """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation.
 
