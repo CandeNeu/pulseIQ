@@ -6,7 +6,4 @@ av
 numpy
 scipy
 requests
-xgboost
 imageio
-python-dotenv
-json
