@@ -49,3 +49,4 @@ df['Pulse'] = ppg[:1000]
 
 plt.plot(df.index, df["Pulse"])
 plt.show()
+

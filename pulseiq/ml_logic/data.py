@@ -52,3 +52,28 @@ def preprocess(df1: pd.DataFrame)-> pd.DataFrame:
     y_cv = df1['cardiovascular_disease']
 
     return df1, X, y_diabetic, y_hypertensive, y_cv
+
+import pandas as pd
+
+def preprocess_user_features(user_data: dict, pulse_rate: float) -> pd.DataFrame:
+    gender_enc = 1 if str(user_data['gender']).lower() in ['male', 'hombre', 'varon', '1'] else 0
+    smoker_enc = 1 if str(user_data['smoker']).lower() in ['yes', 'si', 'sí', '1'] else 0
+    current_smoker_enc = smoker_enc
+
+    height = float(user_data['height'])
+    weight = float(user_data['weight'])
+    age = int(user_data['age'])
+    bmi = weight / (height ** 2)
+
+    features = {
+        'sex': gender_enc,
+        'age': age,
+        'height': height,
+        'weight': weight,
+        'bmi': bmi,
+        'pulse': pulse_rate,
+        'ever_smoked': smoker_enc,
+        'current_smoker': current_smoker_enc,
+    }
+
+    return pd.DataFrame([features])

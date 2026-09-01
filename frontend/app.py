@@ -9,11 +9,10 @@ import imageio.v3 as iio
 from collections import deque
 from scipy.signal import butter, filtfilt
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
-from dotenv import load_dotenv, find_dotenv
+import json
 
-# ============ Environment / secrets ============
-load_dotenv(find_dotenv())  # finds .env even from the frontend/ folder; never commit it
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+
 
 API_URL = os.environ.get(
     "API_URL", "https://pulseiq-api-431111687933.europe-west1.run.app/predict"
@@ -26,7 +25,6 @@ st.markdown(
     """
     <style>
 
-    /* Constrain the content width and add breathing room on the sides */
     .block-container {
         max-width: 1000px;
         padding-top: 2rem;
@@ -200,32 +198,47 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
-    """Ask Gemini for a lifestyle recommendation securely."""
-    if not GEMINI_API_KEY:
-        return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
+    """Ask Gemini for a structured lifestyle recommendation.
 
-    # 1. Tvätta API-nyckeln från dolda mellanslag och radbrytningar
+    Returns a dict with keys: diet, exercise, monitoring (each a list of strings),
+    further_reading (list of {title, url}) and disclaimer. On error returns a dict
+    with an 'error' key instead.
+    """
+    if not GEMINI_API_KEY:
+        return {
+            "error": "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
+        }
+
     safe_api_key = GEMINI_API_KEY.strip()
 
-    # 2. Använd header för säkerhet (ALDRIG i URL:en)
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-3.1-flash-lite-preview:generateContent"
+        "gemini-3.5-flash:generateContent"
     )
     headers = {"x-goog-api-key": safe_api_key, "Content-Type": "application/json"}
 
     diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
     ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
-    system_instruction = """You are an empathetic health and lifestyle educator.
-Your task is to provide practical, everyday lifestyle tips based on the user's risk profile.
+    system_instruction = """You are an empathetic, knowledgeable health and lifestyle educator.
+Return lifestyle recommendations as JSON ONLY — no markdown, no code fences, no text outside the JSON object.
 
-STRICT RULES:
-1. Provide exactly 4 to 6 concise bullet points.
-2. Group the tips across: Diet, Exercise, and General Monitoring.
-3. NEVER provide a medical diagnosis or use diagnostic language.
-4. Always end the response with this exact disclaimer:
-   "*Disclaimer: This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional.*"
+The JSON must have exactly this shape:
+{
+  "diet": ["detailed tip 1", "detailed tip 2"],
+  "exercise": ["detailed tip 1", "detailed tip 2"],
+  "monitoring": ["detailed tip 1", "detailed tip 2"],
+  "further_reading": [{"title": "WHO – Healthy diet", "url": "https://www.who.int/..."}],
+  "disclaimer": "one-line disclaimer text"
+}
+
+RULES:
+1. Each list should have 2-4 detailed, verbose tips that explain the reasoning, not just the instruction.
+2. Where relevant, include concrete statistics (e.g. 150 minutes/week of moderate activity, healthy BMI range 18.5-24.9) and briefly attribute the source type (WHO, CDC, ADA, NHS).
+3. "further_reading" must contain 3-5 links using only these real domains: who.int, cdc.gov, diabetes.org, nhs.uk, mayoclinic.org. Prefer main topic pages; do not invent deep URLs.
+4. NEVER provide a medical diagnosis or diagnostic language.
+5. The "disclaimer" value must be exactly: "This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional."
+6. Output valid JSON only.
 """
 
     user_prompt = f"""Patient Profile:
@@ -237,14 +250,16 @@ Machine Learning Risk Assessment:
 - Diabetes: {diabetes_status}
 - Hypertension: {ht_status}
 
-Please generate the recommendations."""
+Generate the recommendations as JSON."""
 
     body = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {
-            "maxOutputTokens": 400,
+            "maxOutputTokens": 1500,
             "temperature": 0.3,
+            "responseMimeType": "application/json",  # force strict JSON
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
@@ -253,15 +268,20 @@ Please generate the recommendations."""
             resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            text = (
+                text.strip()
+                .removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+            return json.loads(text)
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
-
             if status in (503, 429) and attempt < 2:
                 time.sleep(2)
                 continue
-
-            # 3. Extrahera felet men maskera URL/Nycklar helt
             try:
                 error_details = (
                     e.response.json()
@@ -270,10 +290,11 @@ Please generate the recommendations."""
                 )
             except Exception:
                 error_details = "Could not parse API error response."
-
-            return f"**API Error {status}:** `{error_details}`. (Check that your API key is valid and the model name is correct)."
+            return {"error": f"**API Error {status}:** `{error_details}`"}
         except (KeyError, IndexError):
-            return "Gemini returned an unexpected response format."
+            return {"error": "Gemini returned an unexpected response format."}
+        except json.JSONDecodeError:
+            return {"error": "Gemini did not return valid JSON. Try again."}
 
 
 # ============ Tabs ============
@@ -318,7 +339,7 @@ st.divider()
 if st.session_state.step == 1:
     st.subheader("📝 Step 1: Patient Information")
 
-    col_demo, col_vitals, col_history = st.columns(3)
+    col_demo, col_history = st.columns(2)
 
     with col_demo:
         age = st.number_input("Age", min_value=0, max_value=120, value=st.session_state.age)
