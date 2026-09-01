@@ -119,43 +119,56 @@ def extract_signal_from_video(video_bytes, max_frames=300):
     return signal, fps
 
 
-@st.cache_data(show_spinner=False)
-def get_gemini_recommendation(diabetic, hypertensive, age, bmi, glucose, pulse):
-    """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation.
-
-    Cached: identical inputs return instantly without another API call. Scalar
-    args (not a dict) so Streamlit can hash them for the cache. The API key is
-    sent in a header (never in the URL). Retries on transient 503/429.
-    """
+def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
+    """Ask Gemini for a lifestyle recommendation securely."""
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
+    # 1. Tvätta API-nyckeln från dolda mellanslag och radbrytningar
+    safe_api_key = GEMINI_API_KEY.strip()
+
+    # 2. Använd header för säkerhet (ALDRIG i URL:en)
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-3.5-flash-lite:generateContent"
+        "gemini-3.1-flash-lite-preview:generateContent"
     )
-    headers = {"x-goog-api-key": GEMINI_API_KEY}
+    headers = {"x-goog-api-key": safe_api_key, "Content-Type": "application/json"}
 
-    prompt = f"""You are a helpful health assistant. Based on the data below, write a
-short, friendly set of lifestyle recommendations (diet, exercise, monitoring, and
-when to see a doctor). Do NOT give a diagnosis. Keep it to 4-6 concise bullet points
-and add a one-line disclaimer that this is not medical advice.
+    diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
+    ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
-Patient: age {age}, BMI {bmi}, glucose {glucose}, resting pulse {pulse} bpm.
-Model predictions (1 = at risk, 0 = not at risk):
-- Diabetic: {diabetic}
-- Hypertensive: {hypertensive}
+    system_instruction = """You are an empathetic health and lifestyle educator.
+Your task is to provide practical, everyday lifestyle tips based on the user's risk profile.
+
+STRICT RULES:
+1. Provide exactly 4 to 6 concise bullet points.
+2. Group the tips across: Diet, Exercise, and General Monitoring.
+3. NEVER provide a medical diagnosis or use diagnostic language.
+4. Always end the response with this exact disclaimer:
+   "*Disclaimer: This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional.*"
 """
 
+    user_prompt = f"""Patient Profile:
+- Age: {age}
+- BMI: {bmi}
+- Resting Pulse: {pulse} bpm
+
+Machine Learning Risk Assessment:
+- Diabetes: {diabetes_status}
+- Hypertension: {ht_status}
+
+Please generate the recommendations."""
+
     body = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {
             "maxOutputTokens": 400,
-            "thinkingConfig": {"thinkingBudget": 0},  # 0 = no thinking -> fastest
+            "temperature": 0.3,
         },
     }
 
-    for attempt in range(3):  # retry on transient overload / rate limit
+    for attempt in range(3):
         try:
             resp = requests.post(url, headers=headers, json=body, timeout=30)
             resp.raise_for_status()
@@ -163,12 +176,24 @@ Model predictions (1 = at risk, 0 = not at risk):
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
+
             if status in (503, 429) and attempt < 2:
                 time.sleep(2)
                 continue
-            return "The recommendation service is busy right now. Please try again in a moment."
+
+            # 3. Extrahera felet men maskera URL/Nycklar helt
+            try:
+                error_details = (
+                    e.response.json()
+                    .get("error", {})
+                    .get("message", "Unknown API error")
+                )
+            except Exception:
+                error_details = "Could not parse API error response."
+
+            return f"**API Error {status}:** `{error_details}`. (Check that your API key is valid and the model name is correct)."
         except (KeyError, IndexError):
-            return "Gemini returned an unexpected response."
+            return "Gemini returned an unexpected response format."
 
 
 # ============ Tabs ============
@@ -372,7 +397,6 @@ with tab3:
                 hypertensive=hypertensive_pred,
                 age=age,
                 bmi=bmi,
-                glucose=glucose,
                 pulse=pulse_rate,
             )
 
