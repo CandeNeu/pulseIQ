@@ -575,18 +575,47 @@ elif st.session_state.step == 3:
     st.markdown("---")
     st.markdown("### 🤖 Personalised recommendation")
 
-    with st.spinner("Generating recommendation..."):
-        recommendation = get_gemini_recommendation(
-            diabetic=diabetic_val,
-            hypertensive=hypertensive_val,
-            age=st.session_state.age,
-            bmi=bmi_val,
-            pulse=pulse_rate,
-        )
+       if st.session_state.get("recommendation") is None:
+        with st.spinner("Generating recommendation..."):
+            st.session_state.recommendation = get_gemini_recommendation(
+                diabetic=diabetic_val,
+                hypertensive=hypertensive_val,
+                age=st.session_state.age,
+                bmi=bmi_val,
+                pulse=pulse_rate,
+            )
+    rec = st.session_state.recommendation
 
-    st.markdown(f"<div class='risk-card'>{recommendation}</div>", unsafe_allow_html=True)
+    if "error" in rec:
+        st.error(rec["error"])
+    else:
+        col_diet, col_exercise, col_monitor = st.columns(3)
 
-    # Navegação Final
+        with col_diet:
+            st.markdown("#### 🥗 Diet")
+            for tip in rec.get("diet", []):
+                st.markdown(f"- {tip}")
+
+        with col_exercise:
+            st.markdown("#### 🏃 Exercise")
+            for tip in rec.get("exercise", []):
+                st.markdown(f"- {tip}")
+
+        with col_monitor:
+            st.markdown("#### 📈 Monitoring")
+            for tip in rec.get("monitoring", []):
+                st.markdown(f"- {tip}")
+
+        links = rec.get("further_reading", [])
+        if links:
+            st.markdown("---")
+            st.markdown("#### 📚 Further reading")
+            st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
+
+        if rec.get("disclaimer"):
+            st.caption(f"_{rec['disclaimer']}_")
+
+    # Navigation
     st.markdown("<br>", unsafe_allow_html=True)
     back_col, _, reset_col = st.columns([1, 3, 1])
     with back_col:
@@ -599,4 +628,5 @@ elif st.session_state.step == 3:
             st.session_state.step = 1
             st.session_state.measured_bpm = None
             st.session_state.api_result = None
+            st.session_state.recommendation = None
             st.rerun()
