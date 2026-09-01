@@ -547,11 +547,16 @@ elif st.session_state.step == 3:
     result = st.session_state.api_result
     st.success("Risk assessment complete!")
 
-    diabetic_prob = result.get("diabetic_proba", 0.0)
-    hypertensive_prob = result.get("hypertensive_proba", 0.0)
+    # API returns the probability of class 0 as a decimal (e.g. 0.99).
+    # Risk = probability of the "at risk" class = 1 - that value, as a percent.
+    diabetic_raw = float(result.get("diabetic", 0.0))
+    hypertensive_raw = float(result.get("hypertensive", 0.0))
 
-    diabetic_val = result.get("diabetic", 1 if diabetic_prob >= 50 else 0)
-    hypertensive_val = result.get("hypertensive", 1 if hypertensive_prob >= 50 else 0)
+    diabetic_prob = round((1.0 - diabetic_raw) * 100, 1)
+    hypertensive_prob = round((1.0 - hypertensive_raw) * 100, 1)
+
+    diabetic_val = 1 if diabetic_prob >= 50 else 0
+    hypertensive_val = 1 if hypertensive_prob >= 50 else 0
 
     res_col1, res_col2 = st.columns(2)
 
