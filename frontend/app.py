@@ -120,13 +120,14 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
-    """Ask Gemini (fast Flash-Lite, thinking off) for a lifestyle recommendation."""
+    """Ask Gemini (fast Flash, thinking off) for a lifestyle recommendation."""
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
+    # FIX 1: Use a valid model name (gemini-1.5-flash)
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-3.5-flash-lite:generateContent"
+        "gemini-1.5-flash:generateContent"
     )
     headers = {"x-goog-api-key": GEMINI_API_KEY}
 
@@ -176,10 +177,18 @@ Please generate the recommendations."""
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
+
+            # FIX 2: Extract and return the actual error message from Google's API
+            error_details = (
+                e.response.text if hasattr(e, "response") and e.response else str(e)
+            )
+
             if status in (503, 429) and attempt < 2:
                 time.sleep(2)
                 continue
-            return "The recommendation service is busy right now. Please try again in a moment."
+
+            # If it fails now, Streamlit will show exactly what went wrong
+            return f"**API Error {status}:** `{error_details}`"
         except (KeyError, IndexError):
             return "Gemini returned an unexpected response."
 
