@@ -28,7 +28,6 @@ st.markdown(
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Constrain the content width and add breathing room on the sides */
     .block-container {
         max-width: 1000px;
         padding-top: 2rem;
@@ -120,17 +119,15 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
-    """Ask Gemini for a lifestyle recommendation securely."""
+    """Ask Gemini for a lifestyle recommendation. Key sent in a header, never the URL."""
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
-    # 1. Tvätta API-nyckeln från dolda mellanslag och radbrytningar
     safe_api_key = GEMINI_API_KEY.strip()
 
-    # 2. Använd header för säkerhet (ALDRIG i URL:en)
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-3.1-flash-lite-preview:generateContent"
+        "gemini-3.5-flash-lite:generateContent"
     )
     headers = {"x-goog-api-key": safe_api_key, "Content-Type": "application/json"}
 
@@ -165,6 +162,7 @@ Please generate the recommendations."""
         "generationConfig": {
             "maxOutputTokens": 400,
             "temperature": 0.3,
+            "thinkingConfig": {"thinkingBudget": 0},  # no thinking -> fastest
         },
     }
 
@@ -176,12 +174,9 @@ Please generate the recommendations."""
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
-
             if status in (503, 429) and attempt < 2:
                 time.sleep(2)
                 continue
-
-            # 3. Extrahera felet men maskera URL/Nycklar helt
             try:
                 error_details = (
                     e.response.json()
@@ -190,8 +185,7 @@ Please generate the recommendations."""
                 )
             except Exception:
                 error_details = "Could not parse API error response."
-
-            return f"**API Error {status}:** `{error_details}`. (Check that your API key is valid and the model name is correct)."
+            return f"**API Error {status}:** `{error_details}`"
         except (KeyError, IndexError):
             return "Gemini returned an unexpected response format."
 
@@ -207,7 +201,7 @@ tab1, tab2, tab3 = st.tabs(
 with tab1:
     st.markdown("### Enter patient information")
 
-    col_demo, col_vitals, col_history = st.columns(3)
+    col_demo, col_history = st.columns(2)
 
     with col_demo:
         st.markdown("**Demographics & Body**")
@@ -220,9 +214,11 @@ with tab1:
         bmi = round(weight / (height**2), 2) if height > 0 else 0.0
         st.metric(label="Calculated BMI", value=bmi)
 
-        ever_smoked = st.selectbox("Ever smoked?", ["Yes", "No"])
-        current_smoker = st.selectbox("Current smoker?", ["Yes", "No"])
-
+    with col_history:
+        st.markdown("**Lifestyle**")
+        ever_smoked = st.selectbox("Ever smoked?", ["No", "Yes"])
+        current_smoker = st.selectbox("Current smoker?", ["No", "Yes"])
+        st.caption("Pulse is measured from a video in tab 2.")
 
 # ==========================================
 # TAB 2: PULSE MEASUREMENT
@@ -331,24 +327,20 @@ with tab3:
         use_container_width=True,
         disabled=(pulse_rate is None),
     )
-    # 1. Capture the inputs from your UI first (Streamlit example)
 
     if predict_clicked:
-        try:
-            params = {
-                "sex": 1 if gender == "Male" else 0,
-                "age": int(age or 0),
-                "pulse_rate": int(pulse_rate or 0),
-                "height": float(height or 0.0),
-                "weight": float(weight or 0.0),
-                "bmi": float(bmi or 0.0),
-                "pulse": float(pulse_rate or 0.0),
-                "ever_smoked": 1 if ever_smoked == "Yes" else 0,
-                "current_smoker": 1 if current_smoker == "Yes" else 0,
-            }
-            # Run your prediction here
-        except ValueError:
-            print("Please ensure all numeric fields are filled out correctly.")
+        # All 9 fields the API's PatientFeatures schema expects
+        params = {
+            "sex": 1 if gender == "Male" else 0,
+            "age": int(age),
+            "pulse_rate": int(pulse_rate),
+            "height": float(height),
+            "weight": float(weight),
+            "bmi": float(bmi),
+            "pulse": float(pulse_rate),
+            "ever_smoked": 1 if ever_smoked == "Yes" else 0,
+            "current_smoker": 1 if current_smoker == "Yes" else 0,
+        }
 
         with st.spinner("Analysing via API..."):
             try:
@@ -387,7 +379,7 @@ with tab3:
         with st.expander("Raw API response"):
             st.write(result)
 
-        # -------- Gemini recommendation (fast, cached) --------
+        # -------- Gemini recommendation --------
         st.markdown("---")
         st.markdown("### 🤖 Personalised recommendation")
 
