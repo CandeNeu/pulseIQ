@@ -7,6 +7,7 @@ import pandas as pd
 from pulseiq.api.schemas import PatientFeatures
 from pulseiq.ml_logic.registry import load_model, load_model_from_bucket
 from pulseiq.params import *
+from pulseiq.ml_logic.data import preprocess_user_features
 
 app = FastAPI()
 
