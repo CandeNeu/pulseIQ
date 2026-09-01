@@ -141,6 +141,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 def video_frame_callback(frame):
     """Runs on every camera frame – extracts red brightness (PPG signal)."""
     img = frame.to_ndarray(format="bgr24")
@@ -323,15 +324,17 @@ for i, label in enumerate(step_labels, 1):
         elif st.session_state.step > i:
             st.markdown(f"{label}")
         else:
-            st.markdown(f"<span style='color:{subtext_color}'>{label}</span>",
-                unsafe_allow_html=True,)
+            st.markdown(
+                f"<span style='color:{subtext_color}'>{label}</span>",
+                unsafe_allow_html=True,
+            )
 
 st.divider()
 
 
-#tab1, tab2, tab3 = st.tabs(
- #   ["📝 1. Patient details", "❤️ 2. Pulse measurement", "📊 3. Analysis & Result"]
-#)
+# tab1, tab2, tab3 = st.tabs(
+#   ["📝 1. Patient details", "❤️ 2. Pulse measurement", "📊 3. Analysis & Result"]
+# )
 
 # ==========================================
 # TAB 1: PATIENT DETAILS
@@ -339,21 +342,47 @@ st.divider()
 if st.session_state.step == 1:
     st.subheader("📝 Step 1: Patient Information")
 
-    col_demo,col_vitals,  col_history = st.columns(3)
+    col_demo, col_vitals, col_history = st.columns(3)
 
     with col_demo:
-        age = st.number_input("Age", min_value=0, max_value=120, value=st.session_state.age)
-        gender = st.selectbox("Gender", ["Male", "Female"], index=0 if st.session_state.gender == "Male" else 1)
+        age = st.number_input(
+            "Age", min_value=0, max_value=120, value=st.session_state.age
+        )
+        gender = st.selectbox(
+            "Gender",
+            ["Male", "Female"],
+            index=0 if st.session_state.gender == "Male" else 1,
+        )
 
     with col_vitals:
-        height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=st.session_state.height, step=0.01)
-        weight = st.number_input("Weight (kg)", min_value=20.0, max_value=250.0, value=st.session_state.weight, step=0.5)
+        height = st.number_input(
+            "Height (m)",
+            min_value=1.0,
+            max_value=2.5,
+            value=st.session_state.height,
+            step=0.01,
+        )
+        weight = st.number_input(
+            "Weight (kg)",
+            min_value=20.0,
+            max_value=250.0,
+            value=st.session_state.weight,
+            step=0.5,
+        )
         bmi = round(weight / (height**2), 2) if height > 0 else 0.0
         st.metric(label="Calculated BMI", value=bmi)
 
     with col_history:
-        ever_smoked = st.selectbox("Ever smoked?", ["No", "Yes"], index=0 if st.session_state.ever_smoked == "No" else 1)
-        current_smoker = st.selectbox("Current smoker?", ["No", "Yes"], index=0 if st.session_state.current_smoker == "No" else 1)
+        ever_smoked = st.selectbox(
+            "Ever smoked?",
+            ["No", "Yes"],
+            index=0 if st.session_state.ever_smoked == "No" else 1,
+        )
+        current_smoker = st.selectbox(
+            "Current smoker?",
+            ["No", "Yes"],
+            index=0 if st.session_state.current_smoker == "No" else 1,
+        )
 
     _, next_col = st.columns([4, 1])
     with next_col:
@@ -410,9 +439,7 @@ elif st.session_state.step == 2:
                         f"How strong each possible heart rate is in the signal. "
                         f"The tall peak marks the pulse ({bpm:.0f} bpm)."
                     )
-                    spectrum_df = pd.DataFrame(
-                        {"bpm": freqs_bpm, "strength": spectrum}
-                    )
+                    spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
                     st.line_chart(spectrum_df, x="bpm", y="strength")
             else:
                 st.warning(
@@ -523,14 +550,22 @@ elif st.session_state.step == 3:
     diabetic_val = result.get("diabetic", 0)
     hypertensive_val = result.get("hypertensive", 0)
 
-    diabetic_prob = result.get("diabetic_proba", 78.5 if str(diabetic_val) in ("1", "yes") else 16.2)
-    hypertensive_prob = result.get("hypertensive_proba", 81.0 if str(hypertensive_val) in ("1", "yes") else 19.5)
+    diabetic_prob = result.get(
+        "diabetic_proba", 78.5 if str(diabetic_val) in ("1", "yes") else 16.2
+    )
+    hypertensive_prob = result.get(
+        "hypertensive_proba", 81.0 if str(hypertensive_val) in ("1", "yes") else 19.5
+    )
 
     res_col1, res_col2 = st.columns(2)
 
     with res_col1:
         is_diab_risk = diabetic_prob >= 50.0
-        badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_diab_risk else "<span class='badge-safe'>✅ Low Risk</span>"
+        badge_html = (
+            "<span class='badge-risk'>⚠️ At Risk</span>"
+            if is_diab_risk
+            else "<span class='badge-safe'>✅ Low Risk</span>"
+        )
         val_color = "#ef4444" if is_diab_risk else "#22c55e"
 
         st.markdown(
@@ -550,7 +585,11 @@ elif st.session_state.step == 3:
 
     with res_col2:
         is_hyp_risk = hypertensive_prob >= 50.0
-        badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_hyp_risk else "<span class='badge-safe'>✅ Low Risk</span>"
+        badge_html = (
+            "<span class='badge-risk'>⚠️ At Risk</span>"
+            if is_hyp_risk
+            else "<span class='badge-safe'>✅ Low Risk</span>"
+        )
         val_color = "#ef4444" if is_hyp_risk else "#22c55e"
 
         st.markdown(
@@ -564,7 +603,7 @@ elif st.session_state.step == 3:
                 <p style="color:{subtext_color}; font-size:0.85rem; margin:0;">Estimated risk probability</p>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
         st.progress(float(hypertensive_prob / 100.0))
 
@@ -575,7 +614,7 @@ elif st.session_state.step == 3:
     st.markdown("---")
     st.markdown("### 🤖 Personalised recommendation")
 
-       if st.session_state.get("recommendation") is None:
+    if st.session_state.get("recommendation") is None:
         with st.spinner("Generating recommendation..."):
             st.session_state.recommendation = get_gemini_recommendation(
                 diabetic=diabetic_val,
