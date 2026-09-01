@@ -120,16 +120,15 @@ def extract_signal_from_video(video_bytes, max_frames=300):
 
 
 def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
-    """Ask Gemini (fast Flash, thinking off) for a lifestyle recommendation."""
+    """Ask Gemini for a lifestyle recommendation."""
     if not GEMINI_API_KEY:
         return "⚠️ No GEMINI_API_KEY found. Add it to your .env (local) or Streamlit Secrets (cloud)."
 
-    # FIX 1: Use a valid model name (gemini-1.5-flash)
+    # 1. Lägg API-nyckeln direkt i URL:en istället för i headers
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-1.5-flash:generateContent"
+        f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     )
-    headers = {"x-goog-api-key": GEMINI_API_KEY}
 
     # 1. Translate binary flags into semantic text for better LLM reasoning
     diabetes_status = "Elevated risk" if diabetic == 1 else "Standard risk"
@@ -164,21 +163,21 @@ Please generate the recommendations."""
         "contents": [{"parts": [{"text": user_prompt}]}],
         "generationConfig": {
             "maxOutputTokens": 400,
-            "temperature": 0.3,  # Low temperature for more consistent, clinical tone
-            "thinkingConfig": {"thinkingBudget": 0},
+            "temperature": 0.3,
+            # 2. Ta bort "thinkingConfig" helt, eftersom 1.5-flash inte stöder det.
         },
     }
 
     for attempt in range(3):
         try:
-            resp = requests.post(url, headers=headers, json=body, timeout=30)
+            # 3. Skicka anropet utan det manuella "headers"-objektet
+            resp = requests.post(url, json=body, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except requests.exceptions.RequestException as e:
             status = getattr(e.response, "status_code", None)
 
-            # FIX 2: Extract and return the actual error message from Google's API
             error_details = (
                 e.response.text if hasattr(e, "response") and e.response else str(e)
             )
@@ -187,7 +186,6 @@ Please generate the recommendations."""
                 time.sleep(2)
                 continue
 
-            # If it fails now, Streamlit will show exactly what went wrong
             return f"**API Error {status}:** `{error_details}`"
         except (KeyError, IndexError):
             return "Gemini returned an unexpected response."
