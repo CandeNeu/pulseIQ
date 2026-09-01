@@ -5,14 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 
 from pulseiq.api.schemas import PatientFeatures
-from pulseiq.ml_logic.registry import load_model
+from pulseiq.ml_logic.registry import load_model, load_model_from_bucket
+from pulseiq.params import *
 
 app = FastAPI()
 
+load_model_from_bucket(DIABETES_SYNTAXIS)
+load_model_from_bucket(HYPERTENSIVE_SYNTAXIS)
 
-app.state.diabetic = load_model("diabetic")
-app.state.hypertensive = load_model("hypertensive")
-app.state.cv = load_model("cv")
+app.state.diabetic = load_model(DIABETES_SYNTAXIS)
+app.state.hypertensive = load_model(HYPERTENSIVE_SYNTAXIS)
 
 
 app.add_middleware(
@@ -35,17 +37,14 @@ def predict_diabetis(
 ):
     diabetic_model = app.state.diabetic
     data = pd.DataFrame(features.model_dump(), index=[0])
-    diabetic_prediction = int(diabetic_model.predict(data)[0])
+    diabetic_prediction = float(diabetic_model.predict(data)[0])
 
     hypertensive_model = app.state.hypertensive
 
-    hypertensive_prediction = int(hypertensive_model.predict(data)[0])
+    hypertensive_prediction = float(hypertensive_model.predict(data)[0])
 
-    cv_model = app.state.cv
-    cv_prediction = int(cv_model.predict(data)[0])
 
     return {
         "diabetic": diabetic_prediction,
         "hypertensive": hypertensive_prediction,
-        "cv": cv_prediction,
     }

@@ -1,4 +1,9 @@
 {
+<<<<<<< HEAD
     "roc_auc": 0.8222,
     "brier_score": 0.1622
+=======
+    "roc_auc": 0.8216,
+    "brier_score": 0.1606
+>>>>>>> c744f67f9cf66d87b41ebf66590a98dcfd62b312
 }

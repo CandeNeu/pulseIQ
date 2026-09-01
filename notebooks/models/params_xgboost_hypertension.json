@@ -1,6 +1,7 @@
 {
     "model": "xgboost",
     "target": "hypertension",
+<<<<<<< HEAD
     "best_roc_auc": 0.80779,
     "params": {
         "n_estimators": 100,
@@ -12,6 +13,19 @@
         "gamma": 2.1969282964106166e-05,
         "reg_alpha": 8.965589215433882e-05,
         "reg_lambda": 0.3852761686726348,
+=======
+    "best_roc_auc": 0.80321,
+    "params": {
+        "n_estimators": 100,
+        "max_depth": 7,
+        "learning_rate": 0.01008183045628836,
+        "min_child_weight": 6,
+        "subsample": 0.6643277127537666,
+        "colsample_bytree": 0.8641327043985975,
+        "gamma": 1.0696947246578282e-08,
+        "reg_alpha": 6.543211633048151e-06,
+        "reg_lambda": 5.086132426074288e-07,
+>>>>>>> c744f67f9cf66d87b41ebf66590a98dcfd62b312
         "eval_metric": "logloss",
         "random_state": 42,
         "n_jobs": -1

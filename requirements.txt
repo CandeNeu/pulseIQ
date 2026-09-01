@@ -18,7 +18,7 @@ optuna
 xgboost
 opencv-python
 catboost
-
+python-dotenv
 fastapi
 uvicorn
 pydantic
