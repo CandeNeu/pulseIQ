@@ -18,42 +18,15 @@ API_URL = os.environ.get(
     "API_URL", "https://pulseiq-api-431111687933.europe-west1.run.app/predict"
 )
 
-# ============ Page config and CSS ============
-st.set_page_config(page_title="PulseIQ", page_icon="🩺", layout="wide")
-
-st.markdown(
-    """
-    <style>
-
-    .block-container {
-        max-width: 1000px;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-        padding-left: 3rem;
-        padding-right: 3rem;
-        margin: 0 auto;
-    }
-
-    [data-testid="stMetricValue"] {
-        font-size: 2.5rem;
-        color: #FF4B4B;
-    }
-    .stButton>button {
-        border-radius: 8px;
-        height: 3rem;
-        font-size: 1.1rem;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
+# ============ Page config ============
+st.set_page_config(page_title="pulseIQ", page_icon="🩺", layout="wide")
 
 # ============ Session state ============
 if "step" not in st.session_state:
     st.session_state.step = 1
 
 if "theme_mode" not in st.session_state:
-    st.session_state.theme_mode = "Dark"
+    st.session_state.theme_mode = "Light"  # brand default is the light mint identity
 
 if "age" not in st.session_state:
     st.session_state.age = 25
@@ -79,67 +52,282 @@ if "recommendation" not in st.session_state:
 lock = threading.Lock()
 signal_buffer = st.session_state.signal_buffer
 
-# ============ Session CSS ============
-is_dark = st.session_state.theme_mode == "Dark"
-bg_color = "#0e1117" if is_dark else "#f8f9fa"
-card_bg = "#1e232d" if is_dark else "#ffffff"
-text_color = "#ffffff" if is_dark else "#111827"
-subtext_color = "#94a3b8" if is_dark else "#6b7280"
-border_color = "#e5e7eb" if is_dark else "#e5e7eb"
+# ============ Brand system ============
+# pulseIQ brand kit v1 · palette, type, and usage rules encoded as theme tokens.
+# Primary #5FAE8C · Background #EAF6EF · Text #2E4A3D · Pulse accent #F4B8A8 · Surface #FFFFFF
+PULSE_ACCENT = "#F4B8A8"  # reserved for the pulse line + small highlights only
 
+THEMES = {
+    "Light": {
+        "bg": "#EAF6EF",
+        "surface": "#FFFFFF",
+        "text": "#2E4A3D",
+        "subtext": "#6E8B7C",
+        "primary": "#5FAE8C",
+        "primary_hover": "#4F9C7C",
+        "accent": PULSE_ACCENT,
+        "border": "#D5E8DD",
+        "chip_bg": "rgba(95, 174, 140, 0.12)",
+        "shadow": "rgba(46, 74, 61, 0.08)",
+        "safe_bg": "rgba(95, 174, 140, 0.14)",
+        "safe_fg": "#2E7D5B",
+        "safe_border": "#9AD1BA",
+        "risk_bg": "rgba(244, 184, 168, 0.22)",
+        "risk_fg": "#C15743",
+        "risk_border": "#ED9D89",
+    },
+    "Dark": {
+        "bg": "#142019",
+        "surface": "#1E3227",
+        "text": "#EAF6EF",
+        "subtext": "#9BBBAA",
+        "primary": "#6FBE9C",
+        "primary_hover": "#5FAE8C",
+        "accent": PULSE_ACCENT,
+        "border": "#2C4736",
+        "chip_bg": "rgba(255, 255, 255, 0.06)",
+        "shadow": "rgba(0, 0, 0, 0.35)",
+        "safe_bg": "rgba(111, 190, 156, 0.16)",
+        "safe_fg": "#8FDDBB",
+        "safe_border": "#3E7A60",
+        "risk_bg": "rgba(244, 184, 168, 0.14)",
+        "risk_fg": "#F6C3B4",
+        "risk_border": "#B45640",
+    },
+}
+
+t = THEMES[st.session_state.theme_mode]
+subtext_color = t["subtext"]
+
+# ============ Brand CSS ============
 st.markdown(
     f"""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {{
+        --bg: {t['bg']};
+        --surface: {t['surface']};
+        --text: {t['text']};
+        --subtext: {t['subtext']};
+        --primary: {t['primary']};
+        --primary-hover: {t['primary_hover']};
+        --accent: {t['accent']};
+        --border: {t['border']};
+        --chip-bg: {t['chip_bg']};
+        --shadow: {t['shadow']};
+        --safe-bg: {t['safe_bg']};
+        --safe-fg: {t['safe_fg']};
+        --safe-border: {t['safe_border']};
+        --risk-bg: {t['risk_bg']};
+        --risk-fg: {t['risk_fg']};
+        --risk-border: {t['risk_border']};
+    }}
+
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
+    [data-testid="stHeader"] {{display: none;}}
 
     .stApp {{
-        background-color: {bg_color};
-        color: {text_color};
+        background-color: var(--bg);
+        color: var(--text);
+    }}
+
+    /* ---- Typography: Inter body / Manrope headings / JetBrains Mono data ---- */
+    html, body, .stApp, p, li, label, span, div, input, textarea, select, button,
+    [data-testid="stMarkdownContainer"] {{
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }}
+    h1, h2, h3, h4, h5, h6, .brand-name {{
+        font-family: 'Manrope', system-ui, sans-serif !important;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.015em;
+    }}
+    /* Brand rule DO: all numeric data reads as a real measurement, in mono */
+    code, [data-testid="stMetricValue"], .risk-card h1, .mono {{
+        font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+        font-feature-settings: "tnum" 1;
     }}
 
     .block-container {{
-        max-width: 950px;
-        padding-top: 2rem;
-        padding-bottom: 3rem;
+        max-width: 980px;
+        padding: 2.5rem 3rem 3rem;   /* was 1.5rem — a bit more breathing room up top */
         margin: 0 auto;
     }}
 
+    /* ---- Brand header ---- */
+    .brand-header {{ padding: 0 0 4px; }}
+    .brand-mark {{ display: flex; align-items: center; gap: 16px; }}
+    .brand-name {{
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        line-height: 1;
+    }}
+    .brand-iq {{ color: var(--primary); }}
+    .brand-tagline {{
+        color: var(--subtext);
+        font-size: 1rem;
+        margin: 8px 0 0;
+    }}
+    .pulse-line {{ height: 30px; width: 130px; }}
+
+    /* ---- Step indicator ---- */
+    .step-pill {{
+        display: inline-flex; align-items: center; gap: 8px;
+        font-weight: 600; font-size: 0.92rem;
+    }}
+    .step-num {{
+        font-family: 'JetBrains Mono', monospace;
+        width: 26px; height: 26px; border-radius: 999px;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 0.85rem;
+        border: 1px solid var(--border);
+    }}
+    .step-active .step-num {{ background: var(--primary); color: #fff; border-color: var(--primary); }}
+    .step-active {{ color: var(--text); }}
+    .step-done .step-num {{ background: var(--chip-bg); color: var(--primary); border-color: var(--primary); }}
+    .step-done {{ color: var(--text); }}
+    .step-todo {{ color: var(--subtext); }}
+    .step-todo .step-num {{ color: var(--subtext); }}
+
+    /* ---- Metrics ---- */
+    [data-testid="stMetricValue"] {{ font-size: 2.3rem; color: var(--text); }}
+    [data-testid="stMetricLabel"] p {{ color: var(--subtext); font-weight: 500; }}
+
+    /* ---- Inline data chips ---- */
+    code {{
+        background: var(--chip-bg);
+        color: var(--text);
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.88em;
+    }}
+
+    /* ---- Cards ---- */
     .risk-card {{
-        background-color: {card_bg};
-        border: 1px solid {border_color};
-        border-radius: 12px;
-        padding: 22px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px 24px;
         margin-bottom: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 16px var(--shadow);
     }}
+    .risk-card h1 {{ letter-spacing: -0.02em; }}
 
+    /* ---- Risk badges (coral = small highlight only) ---- */
     .badge-safe {{
-        background-color: rgba(34, 197, 94, 0.15);
-        color: #22c55e;
-        border: 1px solid #22c55e;
+        background: var(--safe-bg);
+        color: var(--safe-fg);
+        border: 1px solid var(--safe-border);
         padding: 4px 12px;
-        border-radius: 20px;
+        border-radius: 999px;
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
     }}
-
     .badge-risk {{
-        background-color: rgba(239, 68, 68, 0.15);
-        color: #ef4444;
-        border: 1px solid #ef4444;
+        background: var(--risk-bg);
+        color: var(--risk-fg);
+        border: 1px solid var(--risk-border);
         padding: 4px 12px;
-        border-radius: 20px;
+        border-radius: 999px;
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
     }}
 
-    .stButton>button {{
-        border-radius: 8px;
+    /* ---- Buttons ---- */
+    .stButton > button {{
+        border-radius: 10px;
         height: 3rem;
         font-size: 1rem;
         font-weight: 600;
+        background: var(--surface);
+        color: var(--text);
+        border: 1px solid var(--border);
+        transition: all 0.15s ease;
     }}
+    .stButton > button:hover {{
+        border-color: var(--primary);
+        color: var(--primary);
+    }}
+    .stButton > button[kind="primary"] {{
+        background: var(--primary);
+        color: #ffffff;
+        border: 1px solid var(--primary);
+    }}
+    .stButton > button[kind="primary"]:hover {{
+        background: var(--primary-hover);
+        border-color: var(--primary-hover);
+        color: #ffffff;
+    }}
+    .stButton > button:disabled {{
+        opacity: 0.5;
+    }}
+
+    /* ---- Progress ---- */
+    .stProgress > div > div > div > div {{ background-color: var(--primary); }}
+
+   /* ---- Inputs ---- */
+    .stNumberInput [data-baseweb="input"],
+    .stTextInput [data-baseweb="input"],
+    [data-baseweb="select"] > div {{
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+        overflow: hidden;                 /* keeps the stepper inside the rounded corners */
+    }}
+    /* kill the default dark top border baseweb adds */
+    .stNumberInput [data-baseweb="input"] > div,
+    .stTextInput [data-baseweb="input"] > div {{
+        border: none !important;
+        background: var(--surface) !important;
+    }}
+    .stNumberInput input,
+    .stTextInput input {{
+        background: var(--surface) !important;
+        color: var(--text) !important;
+        padding: 4px 12px !important;
+    }}
+    /* the - and + stepper buttons */
+    .stNumberInput button {{
+        background: var(--surface) !important;
+        color: var(--text) !important;
+        border: none !important;
+        border-left: 1px solid var(--border) !important;
+    }}
+    .stNumberInput button:hover {{
+        color: var(--primary) !important;
+    }}
+    /* labels visible on the light background */
+    .stNumberInput label, .stTextInput label, .stSelectbox label {{
+        color: var(--text) !important;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }}
+    /* ---- Selectboxes ---- */
+    .stSelectbox [data-baseweb="select"] > div {{
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+        color: var(--text) !important;
+    }}
+    /* the selected value text + the dropdown arrow */
+    .stSelectbox [data-baseweb="select"] div,
+    .stSelectbox [data-baseweb="select"] span,
+    .stSelectbox [data-baseweb="select"] svg {{
+        color: var(--text) !important;
+        fill: var(--text) !important;
+    }}
+    /* focus state on-brand instead of red */
+    .stSelectbox [data-baseweb="select"] > div:focus-within {{
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 2px rgba(95, 174, 140, 0.2) !important;
+    }}
+    /* ---- Divider / alerts polish ---- */
+    hr {{ border-color: var(--border) !important; }}
+    [data-testid="stExpander"] {{ border-radius: 12px; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -302,36 +490,53 @@ Generate the recommendations as JSON."""
             return {"error": "Gemini did not return valid JSON. Try again."}
 
 
-# ============ Header + step indicator ============
+# ============ Branded header + theme switch ============
 header_col, theme_col = st.columns([5, 1])
 
 with header_col:
-    st.title("🩺 PulseIQ – Risk Assessment")
+    st.markdown(
+        """
+        <div class="brand-header">
+          <div class="brand-mark">
+            <span class="brand-name">pulse<span class="brand-iq">IQ</span></span>
+            <svg class="pulse-line" viewBox="0 0 130 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M0 20 H32 L40 6 L50 34 L60 20 H74 L82 12 L90 20 H130"
+                    stroke="#F4B8A8" stroke-width="3"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <p class="brand-tagline">A healthier future, one fingertip away.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 with theme_col:
     selected_theme = st.selectbox(
         "Theme",
-        ["Dark", "Light"],
-        index=0 if st.session_state.theme_mode == "Dark" else 1,
+        ["Light", "Dark"],
+        index=0 if st.session_state.theme_mode == "Light" else 1,
         label_visibility="collapsed",
     )
     if selected_theme != st.session_state.theme_mode:
         st.session_state.theme_mode = selected_theme
         st.rerun()
 
+# ---- Step indicator ----
 step_cols = st.columns(3)
-step_labels = ["1. Patient Details", "2. Pulse Measurement", "3. Analysis & Results"]
+step_labels = ["Patient Details", "Pulse Measurement", "Analysis & Results"]
 for i, label in enumerate(step_labels, 1):
+    if st.session_state.step == i:
+        cls = "step-active"
+    elif st.session_state.step > i:
+        cls = "step-done"
+    else:
+        cls = "step-todo"
     with step_cols[i - 1]:
-        if st.session_state.step == i:
-            st.markdown(f"**{label}**")
-        elif st.session_state.step > i:
-            st.markdown(f"{label}")
-        else:
-            st.markdown(
-                f"<span style='color:{subtext_color}'>{label}</span>",
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f"<div class='step-pill {cls}'><span class='step-num'>{i}</span>{label}</div>",
+            unsafe_allow_html=True,
+        )
 
 st.divider()
 
@@ -340,7 +545,7 @@ st.divider()
 # STEP 1: PATIENT DETAILS
 # ==========================================
 if st.session_state.step == 1:
-    st.subheader("📝 Step 1: Patient Information")
+    st.subheader("Step 1 · Patient information")
 
     col_demo, col_vitals, col_history = st.columns(3)
 
@@ -400,7 +605,8 @@ if st.session_state.step == 1:
 # STEP 2: PULSE MEASUREMENT
 # ==========================================
 elif st.session_state.step == 2:
-    st.markdown("### Upload a video for pulse measurement")
+    st.subheader("Step 2 · Pulse measurement")
+    st.caption("Upload a fingertip video and pulseIQ will read the heartbeat from it.")
 
     col_upload, col_metric = st.columns([2, 1])
 
@@ -427,27 +633,30 @@ elif st.session_state.step == 2:
 
                 graph_col1, graph_col2 = st.columns(2)
                 with graph_col1:
-                    st.markdown("#### ❤️ Filtered pulse signal")
+                    st.markdown("#### Filtered pulse signal")
                     st.caption(
                         "Fingertip brightness over time, with slow drift removed. "
                         "Each peak is one heartbeat."
                     )
-                    st.line_chart(filtered)
+                    # Pulse accent is reserved for the pulse line — used here intentionally.
+                    st.line_chart(filtered, color=PULSE_ACCENT)
                 with graph_col2:
-                    st.markdown("#### 📊 Frequency spectrum")
+                    st.markdown("#### Frequency spectrum")
                     st.caption(
                         f"How strong each possible heart rate is in the signal. "
                         f"The tall peak marks the pulse ({bpm:.0f} bpm)."
                     )
                     spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
-                    st.line_chart(spectrum_df, x="bpm", y="strength")
+                    st.line_chart(
+                        spectrum_df, x="bpm", y="strength", color=t["primary"]
+                    )
             else:
                 st.warning(
                     "Couldn't detect a clear pulse — hold the fingertip still "
                     "on the lens for a few seconds."
                 )
 
-    with st.expander("📹 Or measure from the live camera instead"):
+    with st.expander("Or measure from the live camera instead"):
         st.caption("Cover the lens with your fingertip and hold still.")
         col_cam, col_graph = st.columns(2)
         with col_cam:
@@ -472,7 +681,7 @@ elif st.session_state.step == 2:
                 if len(data) > 5:
                     bpm, filtered, _, _ = compute_bpm(data)
                     if filtered is not None:
-                        chart_ph.line_chart(filtered)
+                        chart_ph.line_chart(filtered, color=PULSE_ACCENT)
                     if bpm:
                         st.session_state.measured_bpm = bpm
                         bpm_ph.metric("Measured pulse", f"{bpm} bpm")
@@ -480,7 +689,7 @@ elif st.session_state.step == 2:
 
     back_col, _, next_col = st.columns([1, 4, 1])
     with back_col:
-        if st.button("⬅️ Back"):
+        if st.button("⬅ Back"):
             st.session_state.step = 1
             st.rerun()
 
@@ -501,7 +710,7 @@ elif st.session_state.step == 2:
 # STEP 3: PREDICTION + GEMINI RECOMMENDATION
 # ==========================================
 elif st.session_state.step == 3:
-    st.subheader("📊 Step 3: Analysis & Prediction")
+    st.subheader("Step 3 · Analysis & prediction")
 
     bmi_val = round(st.session_state.weight / (st.session_state.height**2), 2)
     pulse_rate = int(st.session_state.measured_bpm)
@@ -509,12 +718,12 @@ elif st.session_state.step == 3:
     st.markdown(
         f"""
         <div class="risk-card">
-            <strong>Patient Summary:</strong>
-            Age: <code>{st.session_state.age}</code> |
-            Sex: <code>{st.session_state.gender}</code> |
-            BMI: <code>{bmi_val} kg/m²</code> |
-            Pulse: <code>{pulse_rate} bpm</code> |
-            Smoker: <code>{st.session_state.current_smoker}</code>
+            <strong>Patient summary</strong><br><br>
+            Age <code>{st.session_state.age}</code> &nbsp;·&nbsp;
+            Sex <code>{st.session_state.gender}</code> &nbsp;·&nbsp;
+            BMI <code>{bmi_val} kg/m²</code> &nbsp;·&nbsp;
+            Pulse <code>{pulse_rate} bpm</code> &nbsp;·&nbsp;
+            Smoker <code>{st.session_state.current_smoker}</code>
         </div>
         """,
         unsafe_allow_html=True,
@@ -563,17 +772,17 @@ elif st.session_state.step == 3:
     with res_col1:
         is_diab_risk = diabetic_prob >= 50.0
         badge_html = (
-            "<span class='badge-risk'>⚠️ At Risk</span>"
+            "<span class='badge-risk'>At risk</span>"
             if is_diab_risk
-            else "<span class='badge-safe'>✅ Low Risk</span>"
+            else "<span class='badge-safe'>Low risk</span>"
         )
-        val_color = "#ef4444" if is_diab_risk else "#22c55e"
+        val_color = t["risk_fg"] if is_diab_risk else t["safe_fg"]
 
         st.markdown(
             f"""
             <div class="risk-card">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="margin:0;">🩸 Diabetes</h3>
+                    <h3 style="margin:0;">Diabetes</h3>
                     {badge_html}
                 </div>
                 <h1 style="color:{val_color}; margin: 12px 0 4px 0; font-size:2.8rem;">{diabetic_prob:.1f}%</h1>
@@ -587,17 +796,17 @@ elif st.session_state.step == 3:
     with res_col2:
         is_hyp_risk = hypertensive_prob >= 50.0
         badge_html = (
-            "<span class='badge-risk'>⚠️ At Risk</span>"
+            "<span class='badge-risk'>At risk</span>"
             if is_hyp_risk
-            else "<span class='badge-safe'>✅ Low Risk</span>"
+            else "<span class='badge-safe'>Low risk</span>"
         )
-        val_color = "#ef4444" if is_hyp_risk else "#22c55e"
+        val_color = t["risk_fg"] if is_hyp_risk else t["safe_fg"]
 
         st.markdown(
             f"""
             <div class="risk-card">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="margin:0;">🫀 Hypertension</h3>
+                    <h3 style="margin:0;">Hypertension</h3>
                     {badge_html}
                 </div>
                 <h1 style="color:{val_color}; margin: 12px 0 4px 0; font-size:2.8rem;">{hypertensive_prob:.1f}%</h1>
@@ -613,10 +822,10 @@ elif st.session_state.step == 3:
 
     # -------- Gemini recommendation --------
     st.markdown("---")
-    st.markdown("### 🤖 Personalised recommendation")
+    st.markdown("### Personalised recommendation")
 
     if st.session_state.recommendation is None:
-        if st.button("✨ Get recommendation", type="primary", use_container_width=True):
+        if st.button("Get recommendation", type="primary", use_container_width=True):
             with st.spinner("Generating recommendation..."):
                 st.session_state.recommendation = get_gemini_recommendation(
                     diabetic=diabetic_val,
@@ -632,7 +841,7 @@ elif st.session_state.step == 3:
     if rec is not None:
         if "error" in rec:
             st.error(rec["error"])
-            if st.button("🔄 Retry", type="primary", use_container_width=True):
+            if st.button("Retry", type="primary", use_container_width=True):
                 with st.spinner("Retrying recommendation..."):
                     st.session_state.recommendation = get_gemini_recommendation(
                         diabetic=diabetic_val,
@@ -646,24 +855,24 @@ elif st.session_state.step == 3:
             col_diet, col_exercise, col_monitor = st.columns(3)
 
             with col_diet:
-                st.markdown("#### 🥗 Diet")
+                st.markdown("#### Diet")
                 for tip in rec.get("diet", []):
                     st.markdown(f"- {tip}")
 
             with col_exercise:
-                st.markdown("#### 🏃 Exercise")
+                st.markdown("#### Exercise")
                 for tip in rec.get("exercise", []):
                     st.markdown(f"- {tip}")
 
             with col_monitor:
-                st.markdown("#### 📈 Monitoring")
+                st.markdown("#### Monitoring")
                 for tip in rec.get("monitoring", []):
                     st.markdown(f"- {tip}")
 
             links = rec.get("further_reading", [])
             if links:
                 st.markdown("---")
-                st.markdown("#### 📚 Further reading")
+                st.markdown("#### Further reading")
                 st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
 
             if rec.get("disclaimer"):
@@ -673,12 +882,12 @@ elif st.session_state.step == 3:
     st.markdown("<br>", unsafe_allow_html=True)
     back_col, _, reset_col = st.columns([1, 3, 1])
     with back_col:
-        if st.button("⬅️ Back"):
+        if st.button("⬅ Back"):
             st.session_state.step = 2
             st.rerun()
 
     with reset_col:
-        if st.button("🔄 Start New Test", type="primary", use_container_width=True):
+        if st.button("Start new test", type="primary", use_container_width=True):
             st.session_state.step = 1
             st.session_state.measured_bpm = None
             st.session_state.api_result = None
