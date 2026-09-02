@@ -72,6 +72,9 @@ if "signal_buffer" not in st.session_state:
     st.session_state.signal_buffer = deque(maxlen=300)  # ~10s @ 30fps
 if "measured_bpm" not in st.session_state:
     st.session_state.measured_bpm = None
+if "api_result" not in st.session_state:
+    st.session_state.api_result = None
+
 lock = threading.Lock()
 signal_buffer = st.session_state.signal_buffer
 
@@ -520,16 +523,17 @@ elif st.session_state.step == 3:
     result = st.session_state.api_result
     st.success("Risk assessment complete!")
 
-    diabetic_val = result.get("diabetic", 0)
-    hypertensive_val = result.get("hypertensive", 0)
+    # Pega os valores decimais reais da API (0.99 e 0.95) e converte para porcentagem
+    diabetic_prob = float(result.get("diabetic", 0.0)) * 100.0
+    hypertensive_prob = float(result.get("hypertensive", 0.0)) * 100.0
 
-    diabetic_prob = result.get("diabetic_proba", 78.5 if str(diabetic_val) in ("1", "yes") else 16.2)
-    hypertensive_prob = result.get("hypertensive_proba", 81.0 if str(hypertensive_val) in ("1", "yes") else 19.5)
+    # Determina o status para as badges e cores
+    is_diab_risk = diabetic_prob >= 50.0
+    is_hyp_risk = hypertensive_prob >= 50.0
 
     res_col1, res_col2 = st.columns(2)
 
     with res_col1:
-        is_diab_risk = diabetic_prob >= 50.0
         badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_diab_risk else "<span class='badge-safe'>✅ Low Risk</span>"
         val_color = "#ef4444" if is_diab_risk else "#22c55e"
 
@@ -546,10 +550,9 @@ elif st.session_state.step == 3:
             """,
             unsafe_allow_html=True,
         )
-        st.progress(float(diabetic_prob / 100.0))
+        st.progress(float(min(max(diabetic_prob / 100.0, 0.0), 1.0)))
 
     with res_col2:
-        is_hyp_risk = hypertensive_prob >= 50.0
         badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_hyp_risk else "<span class='badge-safe'>✅ Low Risk</span>"
         val_color = "#ef4444" if is_hyp_risk else "#22c55e"
 
@@ -566,7 +569,7 @@ elif st.session_state.step == 3:
             """,
             unsafe_allow_html=True
         )
-        st.progress(float(hypertensive_prob / 100.0))
+        st.progress(float(min(max(hypertensive_prob / 100.0, 0.0), 1.0)))
 
     with st.expander("Raw API response"):
         st.write(result)
