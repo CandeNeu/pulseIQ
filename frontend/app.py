@@ -74,7 +74,8 @@ if "measured_bpm" not in st.session_state:
     st.session_state.measured_bpm = None
 if "api_result" not in st.session_state:
     st.session_state.api_result = None
-
+if "recommendation" not in st.session_state:
+    st.session_state.recommendation = None
 lock = threading.Lock()
 signal_buffer = st.session_state.signal_buffer
 
@@ -143,6 +144,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 def video_frame_callback(frame):
     """Runs on every camera frame – extracts red brightness (PPG signal)."""
@@ -300,7 +302,7 @@ Generate the recommendations as JSON."""
             return {"error": "Gemini did not return valid JSON. Try again."}
 
 
-# ============ Tabs ============
+# ============ Header + step indicator ============
 header_col, theme_col = st.columns([5, 1])
 
 with header_col:
@@ -326,37 +328,61 @@ for i, label in enumerate(step_labels, 1):
         elif st.session_state.step > i:
             st.markdown(f"{label}")
         else:
-            st.markdown(f"<span style='color:{subtext_color}'>{label}</span>",
-                unsafe_allow_html=True,)
+            st.markdown(
+                f"<span style='color:{subtext_color}'>{label}</span>",
+                unsafe_allow_html=True,
+            )
 
 st.divider()
 
 
-#tab1, tab2, tab3 = st.tabs(
- #   ["📝 1. Patient details", "❤️ 2. Pulse measurement", "📊 3. Analysis & Result"]
-#)
-
 # ==========================================
-# TAB 1: PATIENT DETAILS
+# STEP 1: PATIENT DETAILS
 # ==========================================
 if st.session_state.step == 1:
     st.subheader("📝 Step 1: Patient Information")
 
-    col_demo,col_vitals,  col_history = st.columns(3)
+    col_demo, col_vitals, col_history = st.columns(3)
 
     with col_demo:
-        age = st.number_input("Age", min_value=0, max_value=120, value=st.session_state.age)
-        gender = st.selectbox("Gender", ["Male", "Female"], index=0 if st.session_state.gender == "Male" else 1)
+        age = st.number_input(
+            "Age", min_value=0, max_value=120, value=st.session_state.age
+        )
+        gender = st.selectbox(
+            "Gender",
+            ["Male", "Female"],
+            index=0 if st.session_state.gender == "Male" else 1,
+        )
 
     with col_vitals:
-        height = st.number_input("Height (m)", min_value=1.0, max_value=2.5, value=st.session_state.height, step=0.01)
-        weight = st.number_input("Weight (kg)", min_value=20.0, max_value=250.0, value=st.session_state.weight, step=0.5)
+        height = st.number_input(
+            "Height (m)",
+            min_value=1.0,
+            max_value=2.5,
+            value=st.session_state.height,
+            step=0.01,
+        )
+        weight = st.number_input(
+            "Weight (kg)",
+            min_value=20.0,
+            max_value=250.0,
+            value=st.session_state.weight,
+            step=0.5,
+        )
         bmi = round(weight / (height**2), 2) if height > 0 else 0.0
         st.metric(label="Calculated BMI", value=bmi)
 
     with col_history:
-        ever_smoked = st.selectbox("Ever smoked?", ["No", "Yes"], index=0 if st.session_state.ever_smoked == "No" else 1)
-        current_smoker = st.selectbox("Current smoker?", ["No", "Yes"], index=0 if st.session_state.current_smoker == "No" else 1)
+        ever_smoked = st.selectbox(
+            "Ever smoked?",
+            ["No", "Yes"],
+            index=0 if st.session_state.ever_smoked == "No" else 1,
+        )
+        current_smoker = st.selectbox(
+            "Current smoker?",
+            ["No", "Yes"],
+            index=0 if st.session_state.current_smoker == "No" else 1,
+        )
 
     _, next_col = st.columns([4, 1])
     with next_col:
@@ -371,7 +397,7 @@ if st.session_state.step == 1:
             st.rerun()
 
 # ==========================================
-# TAB 2: PULSE MEASUREMENT
+# STEP 2: PULSE MEASUREMENT
 # ==========================================
 elif st.session_state.step == 2:
     st.markdown("### Upload a video for pulse measurement")
@@ -413,9 +439,7 @@ elif st.session_state.step == 2:
                         f"How strong each possible heart rate is in the signal. "
                         f"The tall peak marks the pulse ({bpm:.0f} bpm)."
                     )
-                    spectrum_df = pd.DataFrame(
-                        {"bpm": freqs_bpm, "strength": spectrum}
-                    )
+                    spectrum_df = pd.DataFrame({"bpm": freqs_bpm, "strength": spectrum})
                     st.line_chart(spectrum_df, x="bpm", y="strength")
             else:
                 st.warning(
@@ -469,12 +493,12 @@ elif st.session_state.step == 2:
             use_container_width=True,
         ):
             st.session_state.step = 3
-            if "api_result" in st.session_state:
-                st.session_state.api_result = None
+            st.session_state.api_result = None
+            st.session_state.recommendation = None
             st.rerun()
 
 # ==========================================
-# TAB 3: PREDICTION + GEMINI RECOMMENDATION
+# STEP 3: PREDICTION + GEMINI RECOMMENDATION
 # ==========================================
 elif st.session_state.step == 3:
     st.subheader("📊 Step 3: Analysis & Prediction")
@@ -523,18 +547,26 @@ elif st.session_state.step == 3:
     result = st.session_state.api_result
     st.success("Risk assessment complete!")
 
-    # Pega os valores decimais reais da API (0.99 e 0.95) e converte para porcentagem
-    diabetic_prob = float(result.get("diabetic", 0.0)) * 100.0
-    hypertensive_prob = float(result.get("hypertensive", 0.0)) * 100.0
+    # API returns the probability of class 0 as a decimal (e.g. 0.99).
+    # Risk = probability of the "at risk" class = 1 - that value, as a percent.
+    diabetic_raw = float(result.get("diabetic", 0.0))
+    hypertensive_raw = float(result.get("hypertensive", 0.0))
 
-    # Determina o status para as badges e cores
-    is_diab_risk = diabetic_prob >= 50.0
-    is_hyp_risk = hypertensive_prob >= 50.0
+    diabetic_prob = round((diabetic_raw) * 100, 1)
+    hypertensive_prob = round((hypertensive_raw) * 100, 1)
+
+    diabetic_val = 1 if diabetic_prob >= 50 else 0
+    hypertensive_val = 1 if hypertensive_prob >= 50 else 0
 
     res_col1, res_col2 = st.columns(2)
 
     with res_col1:
-        badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_diab_risk else "<span class='badge-safe'>✅ Low Risk</span>"
+        is_diab_risk = diabetic_prob >= 50.0
+        badge_html = (
+            "<span class='badge-risk'>⚠️ At Risk</span>"
+            if is_diab_risk
+            else "<span class='badge-safe'>✅ Low Risk</span>"
+        )
         val_color = "#ef4444" if is_diab_risk else "#22c55e"
 
         st.markdown(
@@ -553,7 +585,12 @@ elif st.session_state.step == 3:
         st.progress(float(min(max(diabetic_prob / 100.0, 0.0), 1.0)))
 
     with res_col2:
-        badge_html = "<span class='badge-risk'>⚠️ At Risk</span>" if is_hyp_risk else "<span class='badge-safe'>✅ Low Risk</span>"
+        is_hyp_risk = hypertensive_prob >= 50.0
+        badge_html = (
+            "<span class='badge-risk'>⚠️ At Risk</span>"
+            if is_hyp_risk
+            else "<span class='badge-safe'>✅ Low Risk</span>"
+        )
         val_color = "#ef4444" if is_hyp_risk else "#22c55e"
 
         st.markdown(
@@ -567,29 +604,72 @@ elif st.session_state.step == 3:
                 <p style="color:{subtext_color}; font-size:0.85rem; margin:0;">Estimated risk probability</p>
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
         st.progress(float(min(max(hypertensive_prob / 100.0, 0.0), 1.0)))
 
-    with st.expander("Raw API response"):
-        st.write(result)
+    # with st.expander("Raw API response"):
+    #    st.write(result)
 
     # -------- Gemini recommendation --------
     st.markdown("---")
     st.markdown("### 🤖 Personalised recommendation")
 
-    with st.spinner("Generating recommendation..."):
-        recommendation = get_gemini_recommendation(
-            diabetic=diabetic_val,
-            hypertensive=hypertensive_val,
-            age=st.session_state.age,
-            bmi=bmi_val,
-            pulse=pulse_rate,
-        )
+    if st.session_state.recommendation is None:
+        if st.button("✨ Get recommendation", type="primary", use_container_width=True):
+            with st.spinner("Generating recommendation..."):
+                st.session_state.recommendation = get_gemini_recommendation(
+                    diabetic=diabetic_val,
+                    hypertensive=hypertensive_val,
+                    age=st.session_state.age,
+                    bmi=bmi_val,
+                    pulse=pulse_rate,
+                )
+            st.rerun()
 
-    st.markdown(f"<div class='risk-card'>{recommendation}</div>", unsafe_allow_html=True)
+    rec = st.session_state.recommendation
 
-    # Navegação Final
+    if rec is not None:
+        if "error" in rec:
+            st.error(rec["error"])
+            if st.button("🔄 Retry", type="primary", use_container_width=True):
+                with st.spinner("Retrying recommendation..."):
+                    st.session_state.recommendation = get_gemini_recommendation(
+                        diabetic=diabetic_val,
+                        hypertensive=hypertensive_val,
+                        age=st.session_state.age,
+                        bmi=bmi_val,
+                        pulse=pulse_rate,
+                    )
+                st.rerun()
+        else:
+            col_diet, col_exercise, col_monitor = st.columns(3)
+
+            with col_diet:
+                st.markdown("#### 🥗 Diet")
+                for tip in rec.get("diet", []):
+                    st.markdown(f"- {tip}")
+
+            with col_exercise:
+                st.markdown("#### 🏃 Exercise")
+                for tip in rec.get("exercise", []):
+                    st.markdown(f"- {tip}")
+
+            with col_monitor:
+                st.markdown("#### 📈 Monitoring")
+                for tip in rec.get("monitoring", []):
+                    st.markdown(f"- {tip}")
+
+            links = rec.get("further_reading", [])
+            if links:
+                st.markdown("---")
+                st.markdown("#### 📚 Further reading")
+                st.markdown(" · ".join(f"[{l['title']}]({l['url']})" for l in links))
+
+            if rec.get("disclaimer"):
+                st.caption(f"_{rec['disclaimer']}_")
+
+    # Navigation
     st.markdown("<br>", unsafe_allow_html=True)
     back_col, _, reset_col = st.columns([1, 3, 1])
     with back_col:
@@ -602,4 +682,5 @@ elif st.session_state.step == 3:
             st.session_state.step = 1
             st.session_state.measured_bpm = None
             st.session_state.api_result = None
+            st.session_state.recommendation = None
             st.rerun()

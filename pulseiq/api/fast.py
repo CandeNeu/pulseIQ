@@ -34,19 +34,22 @@ def root():
 
 @app.get("/predict")
 def predict_diabetis(
-
     features: PatientFeatures = Depends(),
 ):
-    diabetic_model = app.state.diabetic
     data = pd.DataFrame(features.model_dump(), index=[0])
-    diabetic_prediction = round(float(diabetic_model.predict_proba(data)[0][1]), 2)
 
+    diabetic_model = app.state.diabetic
     hypertensive_model = app.state.hypertensive
 
-    hypertensive_prediction = round(float(hypertensive_model.predict_proba(data)[0][1]), 2)
-
+    # [0][1] = probability of the positive class ("at risk"), as a percentage
+    diabetic_proba = round(float(diabetic_model.predict_proba(data)[0][1]) * 100, 1)
+    hypertensive_proba = round(
+        float(hypertensive_model.predict_proba(data)[0][1]) * 100, 1
+    )
 
     return {
-        "diabetic": diabetic_prediction,
-        "hypertensive": hypertensive_prediction,
+        "diabetic": int(diabetic_proba >= 50),  # 0/1 class
+        "hypertensive": int(hypertensive_proba >= 50),
+        "diabetic_proba": diabetic_proba,  # e.g. 73.4 (percent)
+        "hypertensive_proba": hypertensive_proba,
     }
