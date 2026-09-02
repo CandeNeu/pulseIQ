@@ -610,11 +610,10 @@ if step == 1:
             smoked_col, smoker_col = st.columns(2)
             with smoked_col:
                 ever_smoked = st.segmented_control(
-                    "Ever smoked",
+                    "Previous smoker",
                     ["No", "Yes"],
                     default=st.session_state.ever_smoked,
                     width="stretch",
-                    help="Has the patient ever smoked cigarettes regularly? Indicates cumulative smoking exposure.",
                 )
             with smoker_col:
                 current_smoker = st.segmented_control(
