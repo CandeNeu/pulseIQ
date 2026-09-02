@@ -1,7 +1,109 @@
+[client]
+# A device UI should not show "Deploy", "Rerun" or "Clear cache" in its corner.
+# "minimal" keeps the viewer affordances (print, theme) and drops developer ones.
+toolbarMode = "minimal"
+
+[server]
+# Reruns on save so edits land without a manual refresh during review.
+runOnSave = true
+
+# PulseIQ — clinical monitoring theme
+#
+# Palette follows bedside patient-monitor convention (IEC 60601-1-8 and the
+# parameter colours used by Philips/GE/Draeger ICU monitors):
+#
+#   green   heart rate / ECG channel, and "within range"
+#   cyan    plethysmograph (the SpO2 / pulse-ox channel) — our PPG trace
+#   yellow  medium-priority alert  — prompt response
+#   red     high-priority alert    — immediate response
+#   white   temperature / neutral readouts
+#
+# Deliberately dark-locked: those colour semantics are specified against a dark
+# display, and a bedside monitor is dark. Defining only [theme] (no [theme.light]
+# / [theme.dark] pair) pins the app to this one mode.
+
 [theme]
-base = "light"
-primaryColor = "#5FAE8C"
-backgroundColor = "#EAF6EF"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#2E4A3D"
-font = "sans serif"
+base = "dark"
+
+# Deep slate rather than pure black — standard for clinical displays, since
+# pure black maximises halation against bright waveform traces.
+backgroundColor = "#0B1220"
+secondaryBackgroundColor = "#121C2B"
+codeBackgroundColor = "#0F1A28"
+
+# Deep instrument teal. Dark enough that Streamlit's white primary-button text
+# clears WCAG AA (5.4:1), while still reading as an accent on the slate ground.
+primaryColor = "#0E7490"
+textColor = "#E2E8F0"
+linkColor = "#38BDF8"
+codeTextColor = "#7DD3FC"
+borderColor = "#22304A"
+
+showWidgetBorder = true
+showSidebarBorder = true
+
+# Instrument panels are square. Rounded corners read as consumer software.
+baseRadius = "4px"
+buttonRadius = "4px"
+
+# IBM Plex was drawn for technical/engineering contexts and ships true tabular
+# figures — digits hold their column as a vital updates, which is the whole game
+# on a monitor. Plex Mono carries the readouts that must not reflow.
+font = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+headingFont = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&display=swap"
+codeFont = "'IBM Plex Mono':https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+
+baseFontSize = 14
+baseFontWeight = 400
+codeFontSize = "13px"
+
+# h1 is reserved for the large vital readouts, so it is sized like one.
+headingFontSizes = ["46px", "24px", "18px", "15px", "13px", "12px"]
+headingFontWeights = [600, 600, 600, 600, 500, 500]
+linkUnderline = false
+
+# Monitor parameter colours. These drive :green[...] / :blue[...] markdown,
+# st.badge, and chart series throughout the app.
+greenColor = "#4ADE80"   # heart rate, in-range
+blueColor = "#38BDF8"    # plethysmograph / PPG channel (the "cyan" channel)
+yellowColor = "#FACC15"  # medium-priority alert
+redColor = "#FB6A6A"     # high-priority alert
+orangeColor = "#FB923C"
+violetColor = "#A78BFA"
+grayColor = "#94A3B8"
+
+# Cyan first: the PPG trace is the primary series in this app.
+chartCategoricalColors = [
+    "#38BDF8",
+    "#4ADE80",
+    "#FACC15",
+    "#A78BFA",
+    "#FB6A6A",
+    "#2DD4BF",
+    "#94A3B8",
+    "#FB923C",
+]
+
+chartSequentialColors = [
+    "#082F49",
+    "#0C4A6E",
+    "#075985",
+    "#0369A1",
+    "#0284C7",
+    "#0EA5E9",
+    "#38BDF8",
+    "#7DD3FC",
+    "#BAE6FD",
+    "#E0F2FE",
+]
+
+dataframeBorderColor = "#22304A"
+dataframeHeaderBackgroundColor = "#121C2B"
+
+[theme.sidebar]
+backgroundColor = "#0A101C"
+secondaryBackgroundColor = "#121C2B"
+codeBackgroundColor = "#0F1A28"
+textColor = "#E2E8F0"
+borderColor = "#22304A"
+primaryColor = "#0E7490"

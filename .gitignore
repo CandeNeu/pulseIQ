@@ -241,3 +241,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 frontend/.env
+
+# Generated code graph and browser-test scratch
+graphify-out/
+.playwright-mcp/
