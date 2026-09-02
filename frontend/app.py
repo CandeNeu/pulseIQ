@@ -496,7 +496,7 @@ with st.sidebar:
             "Modality": "Fingertip PPG",
             "Passband": f"{BAND_LOW_HZ}–{BAND_HIGH_HZ} Hz",
             "Window": f"{MIN_WINDOW_S:.0f}–{WINDOW_S:.0f} s · {ANALYSIS_FS:.0f} Hz",
-            "Inference": "Remote (CatBoost)",
+            "Inference": "Remote (XGBoost)",
         },
         border="horizontal",
         width="stretch",
