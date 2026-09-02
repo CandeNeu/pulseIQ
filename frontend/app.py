@@ -560,10 +560,10 @@ if step == 1:
             ref_col, age_col, sex_col = st.columns([2, 1, 2])
             with ref_col:
                 patient_ref = st.text_input(
-                    "Patient reference",
+                    "Patient name",
                     value=st.session_state.patient_ref,
                     max_chars=24,
-                    placeholder="MRN or study ID",
+                    placeholder="your name",
                     icon=":material/badge:",
                     help="Optional. Enter a medical record number (MRN) or study ID for tracking. Max 24 characters.",
                 )
