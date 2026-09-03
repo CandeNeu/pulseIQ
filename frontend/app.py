@@ -1255,7 +1255,7 @@ elif step == 3:
         # Results are in — retire the cold-start notice.
         cold_start_notice.empty()
 
-    result = st.session_state.api_result
+        result = st.session_state.api_result
 
     diabetic_prob = round(float(result.get("diabetic", 0.0)) * 100, 1)
     hypertensive_prob = round(float(result.get("hypertensive", 0.0)) * 100, 1)
@@ -1282,8 +1282,9 @@ elif step == 3:
         hexes = {"red": "#FB6A6A", "green": "#4ADE80"}
         with column:
             st.markdown(f"{icon} **{title}**")
+
             readout(
-                "Estimated probability (%)", f"{probability:.1f}", None, colour=colour
+                "Estimated probability (%)", f"{probability:.1f}%", None, colour=colour
             )
             with st.skeleton(height=60):
                 st.altair_chart(risk_bar(probability, hexes[colour]))
@@ -1303,6 +1304,7 @@ elif step == 3:
     risk_panel(
         hypertension_col, "Hypertension", ":material/monitor_heart:", hypertensive_prob
     )
+
     # Stated once beneath both panels rather than repeated inside each.
     st.caption("Bars span 0–100%; the dashed rule marks the 50% decision threshold.")
 
