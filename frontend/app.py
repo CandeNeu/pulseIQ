@@ -1255,7 +1255,7 @@ elif step == 3:
         # Results are in — retire the cold-start notice.
         cold_start_notice.empty()
 
-        result = st.session_state.api_result
+    result = st.session_state.api_result
 
     diabetic_prob = round(float(result.get("diabetic", 0.0)) * 100, 1)
     hypertensive_prob = round(float(result.get("hypertensive", 0.0)) * 100, 1)
@@ -1349,23 +1349,23 @@ elif step == 3:
                 st.session_state.recommendation = None
                 st.rerun()
         else:
-            sections = [
-                (
-                    "Population Context",
-                    ":material/groups:",
-                    rec.get("population_context", []),
-                ),
+            pop_context = rec.get("population_context", [])
+            if pop_context:
+                with st.container(border=True):
+                    st.markdown(":material/groups: **Population Context**")
+                    for tip in pop_context:
+                        st.markdown(f"- {tip}")
+
+            st.write("")
+
+            action_sections = [
                 ("Diet", ":material/nutrition:", rec.get("diet", [])),
                 ("Exercise", ":material/directions_run:", rec.get("exercise", [])),
                 ("Monitoring", ":material/vital_signs:", rec.get("monitoring", [])),
             ]
-            # One column per section. Previously hard-coded to st.columns(3),
-            # which silently dropped the 4th card (Monitoring) because zip()
-            # stops at the shortest iterable. len(sections) keeps every card
-            # visible; on narrow viewports Streamlit stacks them automatically.
-            for column, (title, icon, tips) in zip(
-                st.columns(len(sections), border=True, gap="medium"), sections
-            ):
+
+            cols = st.columns(len(action_sections), border=True, gap="medium")
+            for column, (title, icon, tips) in zip(cols, action_sections):
                 with column:
                     st.markdown(f"{icon} **{title}**")
                     for tip in tips:
