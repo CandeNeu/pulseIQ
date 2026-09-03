@@ -19,6 +19,7 @@ import requests
 import streamlit as st
 from streamlit_webrtc import WebRtcMode, webrtc_streamer
 
+
 from ppg import (
     ANALYSIS_FS,
     BAND_HIGH_HZ,
@@ -31,6 +32,22 @@ from ppg import (
     samples_from_video,
 )
 
+WHO_PREVALENCE_REFERENCE = {
+    "diabetes": {
+        "adults_18plus_overall_pct": 14,
+        "adults_65plus_pct": 24,
+        "sex_note": "algo más alta en hombres que en mujeres",
+        "age_note": "aumenta con la edad; pico alrededor de los 75-79 años",
+        "source": "OMS / IDF Diabetes Atlas 2024",
+    },
+    "hypertension": {
+        "adults_30_79_overall_pct": 33,
+        "awareness_note": "cerca del 46% no sabe que la tiene",
+        "sex_note": "algo más frecuente en hombres",
+        "age_note": "aumenta marcadamente con la edad",
+        "source": "OMS, hoja informativa hipertensión",
+    },
+}
 # ============================== Configuration ==============================
 
 API_URL = os.environ.get(
@@ -317,7 +334,7 @@ finding by standard clinical measurement.
 # ============================== Recommendation ==============================
 
 
-def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
+def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse, sex):
     """Ask Gemini for a structured lifestyle recommendation.
 
     Returns a dict with keys: diet, exercise, monitoring (each a list of
@@ -342,28 +359,45 @@ def get_gemini_recommendation(diabetic, hypertensive, age, bmi, pulse):
     ht_status = "Elevated risk" if hypertensive == 1 else "Standard risk"
 
     system_instruction = """You are an empathetic, knowledgeable health and lifestyle educator.
-Return lifestyle recommendations as JSON ONLY — no markdown, no code fences, no text outside the JSON object.
+    Return lifestyle recommendations as JSON ONLY — no markdown, no code fences, no text outside the JSON object.
 
-The JSON must have exactly this shape:
-{
-  "diet": ["detailed tip 1", "detailed tip 2"],
-  "exercise": ["detailed tip 1", "detailed tip 2"],
-  "monitoring": ["detailed tip 1", "detailed tip 2"],
-  "further_reading": [{"title": "WHO – Healthy diet", "url": "https://www.who.int/..."}],
-  "disclaimer": "one-line disclaimer text"
-}
+    The JSON must have exactly this shape:
+    {
+    "population_context": ["detailed statement 1", "detailed statement 2"],
+    "diet": ["detailed tip 1", "detailed tip 2"],
+    "exercise": ["detailed tip 1", "detailed tip 2"],
+    "monitoring": ["detailed tip 1", "detailed tip 2"],
+    "further_reading": [{"title": "WHO – Healthy diet", "url": "https://www.who.int/..."}],
+    "disclaimer": "one-line disclaimer text"
+    }
 
-RULES:
-1. Each list should have 2-4 detailed, verbose tips that explain the reasoning, not just the instruction.
-2. Where relevant, include concrete statistics (e.g. 150 minutes/week of moderate activity, healthy BMI range 18.5-24.9) and briefly attribute the source type (WHO, CDC, ADA, NHS).
-3. "further_reading" must contain 3-5 links using only these real domains: who.int, cdc.gov, diabetes.org, nhs.uk, mayoclinic.org. Prefer main topic pages; do not invent deep URLs.
-4. NEVER provide a medical diagnosis or diagnostic language.
-5. The "disclaimer" value must be exactly: "This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional."
-6. Output valid JSON only.
-"""
+    RULES:
+    1. "population_context" must have 2 statements written in a WARM, PERSONAL, second-person voice
+    (matching the rest of the guidance). Do NOT write an impersonal fact sheet.
+    Start by acknowledging that you can see THIS person's values, then place them relative to
+    their peers. Model the tone on this example:
+    "I can see your values, and for people of your age and sex, you fall within the expected
+    range. In your age group, diabetes prevalence sits at roughly 1% to 15%, a figure that rises
+    with age, according to the WHO and the IDF Diabetes Atlas 2024."
+    - Weave in the person's OWN data from the profile — their age, sex, BMI, resting pulse — so it
+        reads as tailored to them specifically.
+    - Give the prevalence for THEIR age group as an APPROXIMATE RANGE, derived from the WHO/IDF
+        reference data provided, and state that their values fall WITHIN the expected range for their
+        group when that is the case.
+    - This is a COMPARISON to their group, NOT a personal prediction. NEVER write "you have an
+        X% chance of developing..."; always frame it as "you fall within the expected range for
+        your group". Keep it clearly separate from the ML risk assessment.
+    2. Each list should have 2-4 detailed, verbose tips that explain the reasoning, not just the instruction.
+    3. Where relevant, include concrete statistics (e.g. 150 minutes/week of moderate activity, healthy BMI range 18.5-24.9) and briefly attribute the source type (WHO, CDC, ADA, NHS).
+    4. "further_reading" must contain 3-5 links using only these real domains: who.int, cdc.gov, diabetes.org, nhs.uk, mayoclinic.org. Prefer main topic pages; do not invent deep URLs.
+    5. NEVER provide a medical diagnosis or diagnostic language. Population figures must stay descriptive, framing the person as within (or outside) the expected range for their group — never predicting this individual's future.
+    6. The "disclaimer" value must be exactly: "This is an automated lifestyle suggestion based on statistical data, not medical advice. Always consult a healthcare professional."
+    7. Output valid JSON only.
+    """
 
     user_prompt = f"""Patient Profile:
 - Age: {age}
+- Sex: {sex}
 - BMI: {bmi}
 - Resting Pulse: {pulse} bpm
 
@@ -371,8 +405,11 @@ Machine Learning Risk Assessment:
 - Diabetes: {diabetes_status}
 - Hypertension: {ht_status}
 
-Generate the recommendations as JSON."""
+WHO / IDF reference prevalence data (global adults) — use ONLY these figures for
+population_context, do not recall any others from memory:
+{json.dumps(WHO_PREVALENCE_REFERENCE, ensure_ascii=False)}
 
+Generate the recommendations as JSON."""
     body = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
@@ -1297,6 +1334,7 @@ elif step == 3:
                         age=st.session_state.age,
                         bmi=bmi_val,
                         pulse=pulse_rate,
+                        sex=st.session_state.gender,
                     )
                 st.rerun()
 
@@ -1310,14 +1348,21 @@ elif step == 3:
                 st.rerun()
         else:
             sections = [
+                (
+                    "Population Context",
+                    ":material/groups:",
+                    rec.get("population_context", []),
+                ),
                 ("Diet", ":material/nutrition:", rec.get("diet", [])),
                 ("Exercise", ":material/directions_run:", rec.get("exercise", [])),
                 ("Monitoring", ":material/vital_signs:", rec.get("monitoring", [])),
             ]
-            # Responsive grid: 3 columns on wide, 2 on tablet, 1 on mobile
-            # On narrow viewports, Streamlit's default column wrapping will stack them
+            # One column per section. Previously hard-coded to st.columns(3),
+            # which silently dropped the 4th card (Monitoring) because zip()
+            # stops at the shortest iterable. len(sections) keeps every card
+            # visible; on narrow viewports Streamlit stacks them automatically.
             for column, (title, icon, tips) in zip(
-                st.columns(3, border=True, gap="medium"), sections
+                st.columns(len(sections), border=True, gap="medium"), sections
             ):
                 with column:
                     st.markdown(f"{icon} **{title}**")
